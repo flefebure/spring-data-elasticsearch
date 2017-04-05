@@ -80,6 +80,16 @@ public interface ElasticsearchOperations {
 	<T> boolean createIndex(Class<T> clazz, Object settings);
 
 	/**
+	 * Create an index for given class and indexName
+	 *
+	 * @param clazz
+	 * @param settings
+	 * @param indexName
+	 */
+	<T> boolean createIndex(Class<T> clazz, Object settings, String indexName);
+
+
+	/**
 	 * Create mapping for a class
 	 *
 	 * @param clazz
@@ -103,6 +113,15 @@ public interface ElasticsearchOperations {
 	 * @param mappings
 	 */
 	<T> boolean putMapping(Class<T> clazz, Object mappings);
+
+	/**
+	 * Create mapping for a entity
+	 *
+	 * @param clazz
+	 * @param mappings
+	 * @param indexName
+	 */
+	public <T> boolean putMapping(Class<T> clazz, Object mappings, String indexName);
 
 
 	/**
@@ -572,6 +591,8 @@ public interface ElasticsearchOperations {
 
 	<T> T query(SearchQuery query, ResultsExtractor<T> resultsExtractor);
 
+	<T> T query(SearchQuery query, ResultsExtractor<T> resultsExtractor, Class clazz);
 
 	ElasticsearchPersistentEntity getPersistentEntityFor(Class clazz);
+
 }

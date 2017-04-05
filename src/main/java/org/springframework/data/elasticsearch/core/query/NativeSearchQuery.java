@@ -43,6 +43,9 @@ public class NativeSearchQuery extends AbstractQuery implements SearchQuery {
 	private List<AbstractAggregationBuilder> aggregations;
 	private HighlightBuilder.Field[] highlightFields;
 	private List<IndexBoost> indicesBoost;
+	private int from;
+	private int size;
+	private String preference;
 
 
 	public NativeSearchQuery(QueryBuilder query) {
@@ -135,6 +138,33 @@ public class NativeSearchQuery extends AbstractQuery implements SearchQuery {
 
 	public void setIndicesBoost(List<IndexBoost> indicesBoost) {
 		this.indicesBoost = indicesBoost;
+	}
+
+	@Override
+	public int getFrom() {
+		return from;
+	}
+
+	public void setFrom(int from) {
+		this.from = from;
+	}
+
+	@Override
+	public int getSize() {
+		return size;
+	}
+
+	public void setSize(int size) {
+		this.size = size;
+	}
+
+	@Override
+	public String getPreference() {
+		return preference;
+	}
+
+	public void setPreference(String preference) {
+		this.preference = preference;
 	}
 
 }

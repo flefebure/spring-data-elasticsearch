@@ -144,8 +144,13 @@ public abstract class AbstractElasticsearchRepository<T, ID extends Serializable
 	@Override
 	public <S extends T> S save(S entity) {
 		Assert.notNull(entity, "Cannot save 'null' entity.");
-		elasticsearchOperations.index(createIndexQuery(entity));
-		elasticsearchOperations.refresh(entityInformation.getIndexName());
+		IndexQuery query = createIndexQuery(entity);
+		elasticsearchOperations.index(query);
+		String indexName = entityInformation.getIndexName();
+		if (entityInformation.getPartitionersFields().length > 0 && query.getIndexName() != null) {
+			indexName = query.getIndexName();
+		}
+		elasticsearchOperations.refresh(indexName);
 		return entity;
 	}
 
@@ -221,9 +226,8 @@ public abstract class AbstractElasticsearchRepository<T, ID extends Serializable
 	@Override
 	public void delete(ID id) {
 		Assert.notNull(id, "Cannot delete entity with id 'null'.");
-		elasticsearchOperations.delete(entityInformation.getIndexName(), entityInformation.getType(),
-				stringIdRepresentation(id));
-		elasticsearchOperations.refresh(entityInformation.getIndexName());
+		elasticsearchOperations.delete(entityClass, stringIdRepresentation(id));
+		elasticsearchOperations.refresh(entityInformation.getIndexName()+"*");
 	}
 
 	@Override

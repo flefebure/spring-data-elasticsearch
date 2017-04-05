@@ -17,16 +17,18 @@ package org.springframework.data.elasticsearch.core.mapping;
 
 import static org.springframework.util.StringUtils.*;
 
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.expression.BeanFactoryAccessor;
 import org.springframework.context.expression.BeanFactoryResolver;
-import org.springframework.data.elasticsearch.annotations.Document;
-import org.springframework.data.elasticsearch.annotations.Parent;
-import org.springframework.data.elasticsearch.annotations.Setting;
+import org.springframework.data.elasticsearch.annotations.*;
+import org.springframework.data.elasticsearch.core.partition.DefaultElasticsearchPartitioner;
+import org.springframework.data.elasticsearch.core.partition.ElasticsearchPartitioner;
 import org.springframework.data.mapping.model.BasicPersistentEntity;
 import org.springframework.data.util.TypeInformation;
 import org.springframework.expression.Expression;
@@ -59,11 +61,18 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 	private ElasticsearchPersistentProperty parentIdProperty;
 	private String settingPath;
 	private boolean createIndexAndMapping;
+	private String[] partitionersFields;
+	private Partitioner[] partitioners;
+	private String[] partitionersParameters;
+	private String partitionSeparator;
+	private ElasticsearchPartitioner indexPartitioner;
+	Map<String, ElasticsearchPersistentProperty> innerHitsProperties;
 
 	public SimpleElasticsearchPersistentEntity(TypeInformation<T> typeInformation) {
 		super(typeInformation);
 		this.context = new StandardEvaluationContext();
 		this.parser = new SpelExpressionParser();
+		this.indexPartitioner = new DefaultElasticsearchPartitioner();
 
 		Class<T> clazz = typeInformation.getType();
 		if (clazz.isAnnotationPresent(Document.class)) {
@@ -78,6 +87,10 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 			this.refreshInterval = document.refreshInterval();
 			this.indexStoreType = document.indexStoreType();
 			this.createIndexAndMapping = document.createIndex();
+			this.partitionersFields = typeInformation.getType().getAnnotation(Document.class).partitionersFields();
+			this.partitioners = typeInformation.getType().getAnnotation(Document.class).partitioners();
+			this.partitionersParameters = typeInformation.getType().getAnnotation(Document.class).partitionersParameters();
+			this.partitionSeparator = typeInformation.getType().getAnnotation(Document.class).partitionSeparator();
 		}
 		if (clazz.isAnnotationPresent(Setting.class)) {
 			this.settingPath = typeInformation.getType().getAnnotation(Setting.class).settingPath();
@@ -96,6 +109,16 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 		Expression expression = parser.parseExpression(indexName, ParserContext.TEMPLATE_EXPRESSION);
 		return expression.getValue(context, String.class);
 	}
+
+	@Override
+	public String getIndexName(T object) {
+		Expression expression = parser.parseExpression(indexName, ParserContext.TEMPLATE_EXPRESSION);
+		String indexName = expression.getValue(context, String.class);
+		if (partitioners.length == 0) return indexName;
+		String partitionPostfix = indexPartitioner.extractPartitionKeyFromObject(object, this);
+		return indexName+partitionSeparator+partitionPostfix;
+	}
+
 
 	@Override
 	public String getIndexType() {
@@ -140,7 +163,8 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 
 	@Override
 	public String settingPath() {
-		return settingPath;
+		Expression expression = parser.parseExpression(settingPath, ParserContext.TEMPLATE_EXPRESSION);
+		return expression.getValue(context, String.class);
 	}
 
 	@Override
@@ -166,5 +190,42 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 		if (property.isVersionProperty()) {
 			Assert.isTrue(property.getType() == Long.class, "Version property should be Long");
 		}
+
+		if (property.getField() != null) {
+			InnerHits innerHits = property.getField().getAnnotation(InnerHits.class);
+			if (innerHits != null) {
+				if (innerHitsProperties == null)
+					innerHitsProperties = new HashMap<String, ElasticsearchPersistentProperty>();
+				Assert.isTrue(!innerHitsProperties.containsKey(innerHits.path()), "Only one filed can be mapped with the same innerHi path");
+				innerHitsProperties.put(innerHits.path(), property);
+			}
+		}
+	}
+	public Partitioner[] getPartitioners() {
+		return partitioners;
+	}
+
+	@Override
+	public String[] getPartitionersParameters() {
+		String[] parameters = new String[partitionersParameters.length];
+		for (int i = 0; i < partitionersParameters.length; i++) {
+			Expression expression = parser.parseExpression(partitionersParameters[i], ParserContext.TEMPLATE_EXPRESSION);
+			parameters[i] = expression.getValue(context, String.class);
+		}
+		return parameters;
+	}
+
+	@Override
+	public String[] getPartitionersFields() {
+		return partitionersFields;
+	}
+
+	@Override
+	public String getPartitionSeparator() {
+		return partitionSeparator;
+	}
+	@Override
+	public Map<String, ElasticsearchPersistentProperty> innerHitsProperties() {
+		return innerHitsProperties;
 	}
 }

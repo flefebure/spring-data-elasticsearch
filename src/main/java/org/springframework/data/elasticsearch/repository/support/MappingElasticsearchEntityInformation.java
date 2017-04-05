@@ -19,6 +19,7 @@ import java.io.Serializable;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.elasticsearch.annotations.Partitioner;
 import org.springframework.data.elasticsearch.core.mapping.ElasticsearchPersistentEntity;
 import org.springframework.data.elasticsearch.core.mapping.ElasticsearchPersistentProperty;
 import org.springframework.data.repository.core.support.PersistentEntityInformation;
@@ -97,5 +98,19 @@ public class MappingElasticsearchEntityInformation<T, ID extends Serializable> e
 			throw new IllegalStateException("failed to load parent ID: " + e, e);
 		}
 		return null;
+	}
+	@Override
+	public Partitioner[] getPartitioners() {
+		return entityMetadata.getPartitioners();
+	}
+
+	@Override
+	public String[] getPartitionersParameters() {
+		return entityMetadata.getPartitionersParameters();
+	}
+
+	@Override
+	public String[] getPartitionersFields() {
+		return entityMetadata.getPartitionersFields();
 	}
 }

@@ -26,6 +26,7 @@ import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
 import org.elasticsearch.search.sort.SortBuilder;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.elasticsearch.core.facet.FacetRequest;
+import org.springframework.data.elasticsearch.core.partition.keys.Partition;
 
 /**
  * NativeSearchQuery
@@ -54,6 +55,15 @@ public class NativeSearchQueryBuilder {
 	private Collection<String> ids;
 	private String route;
 	private SearchType searchType;
+	private List<Partition> partitions = new ArrayList<Partition>();
+	private int from;
+	private int size;
+	private String preference;
+
+	public NativeSearchQueryBuilder withPreference(String preference) {
+		this.preference = preference;
+		return this;
+	}
 
 	public NativeSearchQueryBuilder withQuery(QueryBuilder queryBuilder) {
 		this.queryBuilder = queryBuilder;
@@ -193,7 +203,28 @@ public class NativeSearchQueryBuilder {
 		if (searchType != null) {
 			nativeSearchQuery.setSearchType(searchType);
 		}
+		if (!partitions.isEmpty()) {
+			nativeSearchQuery.setPartitions(partitions);
+		}
+		nativeSearchQuery.setFrom(from);
+		nativeSearchQuery.setSize(size);
+		nativeSearchQuery.setPreference(preference);
 
 		return nativeSearchQuery;
+	}
+
+	public NativeSearchQueryBuilder withPartition(Partition partition) {
+		this.partitions.add(partition);
+		return this;
+	}
+
+	public NativeSearchQueryBuilder withFrom(int from) {
+		this.from = from;
+		return this;
+	}
+
+	public NativeSearchQueryBuilder withSize(int size) {
+		this.size = size;
+		return this;
 	}
 }

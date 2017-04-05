@@ -18,6 +18,7 @@ package org.springframework.data.elasticsearch.repository.query;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.mapping.ElasticsearchPersistentProperty;
+import org.springframework.data.elasticsearch.core.partition.keys.Partition;
 import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
 import org.springframework.data.elasticsearch.repository.query.parser.ElasticsearchQueryCreator;
 import org.springframework.data.mapping.context.MappingContext;
@@ -26,6 +27,8 @@ import org.springframework.data.repository.query.parser.PartTree;
 import org.springframework.util.ClassUtils;
 import org.springframework.data.util.CloseableIterator;
 import org.springframework.data.util.StreamUtils;
+
+import java.util.Arrays;
 
 /**
  * ElasticsearchPartQuery
@@ -49,6 +52,10 @@ public class ElasticsearchPartQuery extends AbstractElasticsearchRepositoryQuery
 	public Object execute(Object[] parameters) {
 		ParametersParameterAccessor accessor = new ParametersParameterAccessor(queryMethod.getParameters(), parameters);
 		CriteriaQuery query = createQuery(accessor);
+		Partition[] partitions =  getPartitions(parameters);
+		if (partitions != null) {
+			query.getPartitions().addAll(Arrays.asList(partitions));
+		}
 		if(tree.isDelete()) {
 			Object result = countOrGetDocumentsForDelete(query, accessor);
 			elasticsearchOperations.delete(query, queryMethod.getEntityInformation().getJavaType());
@@ -100,5 +107,19 @@ public class ElasticsearchPartQuery extends AbstractElasticsearchRepositoryQuery
 
 	public CriteriaQuery createQuery(ParametersParameterAccessor accessor) {
 		return new ElasticsearchQueryCreator(tree, accessor, mappingContext).createQuery();
+	}
+
+
+	private Partition[] getPartitions(Object[] parameters) {
+
+		for (Object parameter : parameters) {
+			if (parameter instanceof Partition[]) {
+				return (Partition[])parameter;
+			}
+			else if (parameter instanceof Partition) {
+				return new Partition[]{(Partition)parameter};
+			}
+		}
+		return null;
 	}
 }

@@ -70,7 +70,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
+import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.data.domain.*;
 import org.springframework.data.elasticsearch.ElasticsearchException;
 import org.springframework.data.elasticsearch.annotations.Document;
@@ -83,6 +85,7 @@ import org.springframework.data.elasticsearch.core.convert.MappingElasticsearchC
 import org.springframework.data.elasticsearch.core.facet.FacetRequest;
 import org.springframework.data.elasticsearch.core.mapping.ElasticsearchPersistentEntity;
 import org.springframework.data.elasticsearch.core.mapping.SimpleElasticsearchMappingContext;
+import org.springframework.data.elasticsearch.core.partition.ElasticsearchPartitioner;
 import org.springframework.data.elasticsearch.core.query.*;
 import org.springframework.data.mapping.PersistentProperty;
 import org.springframework.data.util.CloseableIterator;
@@ -108,6 +111,11 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 	private ElasticsearchConverter elasticsearchConverter;
 	private ResultsMapper resultsMapper;
 	private String searchTimeout;
+	private ElasticsearchPartitioner elasticsearchPartitioner;
+
+	public void setElasticsearchPartitioner(ElasticsearchPartitioner elasticsearchPartitioner) {
+		this.elasticsearchPartitioner = elasticsearchPartitioner;
+	}
 
 	public ElasticsearchTemplate(Client client) {
 		this(client, new MappingElasticsearchConverter(new SimpleElasticsearchMappingContext()));
@@ -164,31 +172,39 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 	@Override
 	public <T> boolean putMapping(Class<T> clazz) {
-		if (clazz.isAnnotationPresent(Mapping.class)) {
-			String mappingPath = clazz.getAnnotation(Mapping.class).mappingPath();
-			if (isNotBlank(mappingPath)) {
-				String mappings = readFileFromClasspath(mappingPath);
-				if (isNotBlank(mappings)) {
-					return putMapping(clazz, mappings);
+		ElasticsearchPersistentEntity<T> persistentEntity = getPersistentEntityFor(clazz);
+		return putMapping(clazz, null, persistentEntity.getIndexName());
+	}
+
+	@Override
+	public <T> boolean putMapping(Class<T> clazz, Object mappings, String indexName) {
+		ElasticsearchPersistentEntity<T> persistentEntity = getPersistentEntityFor(clazz);
+		if (mappings == null) {
+			if (clazz.isAnnotationPresent(Mapping.class)) {
+				String mappingPath = clazz.getAnnotation(Mapping.class).mappingPath();
+				if (isNotBlank(mappingPath)) {
+					mappings = readFileFromClasspath(mappingPath);
+				} else {
+					logger.info("mappingPath in @Mapping has to be defined. Building mappings using @Field");
 				}
-			} else {
-				logger.info("mappingPath in @Mapping has to be defined. Building mappings using @Field");
+			}
+			if (mappings == null) {
+				try {
+					mappings = buildMapping(clazz, persistentEntity.getIndexType(), persistentEntity
+							.getIdProperty().getFieldName(), persistentEntity.getParentType());
+				} catch (Exception e) {
+					throw new ElasticsearchException("Failed to build mapping for " + clazz.getSimpleName(), e);
+				}
 			}
 		}
-		ElasticsearchPersistentEntity<T> persistentEntity = getPersistentEntityFor(clazz);
-		XContentBuilder xContentBuilder = null;
-		try {
-			xContentBuilder = buildMapping(clazz, persistentEntity.getIndexType(), persistentEntity
-					.getIdProperty().getFieldName(), persistentEntity.getParentType());
-		} catch (Exception e) {
-			throw new ElasticsearchException("Failed to build mapping for " + clazz.getSimpleName(), e);
-		}
-		return putMapping(clazz, xContentBuilder);
+
+		return putMapping(indexName, persistentEntity.getIndexType(), mappings);
 	}
 
 	@Override
 	public <T> boolean putMapping(Class<T> clazz, Object mapping) {
-		return putMapping(getPersistentEntityFor(clazz).getIndexName(), getPersistentEntityFor(clazz).getIndexType(), mapping);
+		ElasticsearchPersistentEntity persistentEntity = getPersistentEntityFor(clazz);
+		return putMapping(persistentEntity.getIndexName(), persistentEntity.getIndexType(), mapping);
 	}
 
 	@Override
@@ -223,7 +239,11 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 	@Override
 	public <T> Map getMapping(Class<T> clazz) {
-		return getMapping(getPersistentEntityFor(clazz).getIndexName(), getPersistentEntityFor(clazz).getIndexType());
+		ElasticsearchPersistentEntity persistentEntity = getPersistentEntityFor(clazz);
+		if (elasticsearchPartitioner != null && elasticsearchPartitioner.isIndexPartitioned(clazz)) {
+			throw new ElasticsearchException("Failed to get mapping for " + clazz.getSimpleName()+". Index is partitioned. You need to specify indexName");
+		}
+		return getMapping(persistentEntity.getIndexName(), persistentEntity.getIndexType());
 	}
 
 	@Override
@@ -233,14 +253,20 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 	@Override
 	public <T> T queryForObject(GetQuery query, Class<T> clazz) {
+		ElasticsearchPersistentEntity persistentEntity = getPersistentEntityFor(clazz);
+
 		return queryForObject(query, clazz, resultsMapper);
 	}
 
 	@Override
 	public <T> T queryForObject(GetQuery query, Class<T> clazz, GetResultMapper mapper) {
 		ElasticsearchPersistentEntity<T> persistentEntity = getPersistentEntityFor(clazz);
+		String indice = persistentEntity.getIndexName();
+		if (elasticsearchPartitioner != null && elasticsearchPartitioner.isIndexPartitioned(clazz)) {
+			indice = elasticsearchPartitioner.processPartitioning(query, clazz);
+		}
 		GetResponse response = client
-				.prepareGet(persistentEntity.getIndexName(), persistentEntity.getIndexType(), query.getId()).execute()
+				.prepareGet(indice, persistentEntity.getIndexType(), query.getId()).execute()
 				.actionGet();
 
 		T entity = mapper.mapResult(response, clazz);
@@ -268,14 +294,22 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 	@Override
 	public <T> AggregatedPage<T> queryForPage(SearchQuery query, Class<T> clazz, SearchResultMapper mapper) {
-		SearchResponse response = doSearch(prepareSearch(query, clazz), query);
+		SearchRequestBuilder builder = prepareSearch(query, clazz);
+		SearchResponse response = doSearch(builder, query);
 		return mapper.mapResults(response, clazz, query.getPageable());
 	}
 
 	@Override
 	public <T> T query(SearchQuery query, ResultsExtractor<T> resultsExtractor) {
-		SearchResponse response = doSearch(prepareSearch(query), query);
+		SearchRequestBuilder builder = prepareSearch(query);
+		SearchResponse response = doSearch(builder, query);
 		return resultsExtractor.extract(response);
+	}
+
+	@Override
+	public <T> T query(SearchQuery query, ResultsExtractor<T> resultsExtractor, Class clazz) {
+		setPersistentEntityIndexAndType(query, clazz);
+		return query(query, resultsExtractor);
 	}
 
 	@Override
@@ -295,7 +329,11 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 	@Override
 	public <T> List<String> queryForIds(SearchQuery query) {
-		SearchRequestBuilder request = prepareSearch(query).setQuery(query.getQuery());
+		SearchRequestBuilder request = prepareSearch(query);
+		if (request == null) {
+			return new ArrayList<String>();
+		}
+		request.setQuery(query.getQuery()).setFetchSource(false);
 		if (query.getFilter() != null) {
 			request.setPostFilter(query.getFilter());
 		}
@@ -422,7 +460,10 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 		QueryBuilder elasticsearchFilter = new CriteriaFilterProcessor().createFilterFromCriteria(criteriaQuery.getCriteria());
 
 		if (elasticsearchFilter == null) {
-			return doCount(prepareCount(criteriaQuery, clazz), elasticsearchQuery);
+			SearchRequestBuilder builder = prepareCount(criteriaQuery, clazz);
+			if (builder == null)
+				return 0l;
+			return doCount(builder, elasticsearchQuery);
 		} else {
 			// filter could not be set into CountRequestBuilder, convert request into search request
 			return doCount(prepareSearch(criteriaQuery, clazz), elasticsearchQuery, elasticsearchFilter);
@@ -473,15 +514,19 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 	}
 
 	private <T> SearchRequestBuilder prepareCount(Query query, Class<T> clazz) {
-		String indexName[] = !isEmpty(query.getIndices()) ? query.getIndices().toArray(new String[query.getIndices().size()]) : retrieveIndexNameFromPersistentEntity(clazz);
-		String types[] = !isEmpty(query.getTypes()) ? query.getTypes().toArray(new String[query.getTypes().size()]) : retrieveTypeFromPersistentEntity(clazz);
+		setPersistentEntityIndexAndType(query, clazz);
+		if (elasticsearchPartitioner != null && elasticsearchPartitioner.isIndexPartitioned(clazz)) {
+			if (query.getIndices().isEmpty())
+				return null;
+		}
+		else {
+			Assert.notEmpty(query.getIndices(), "No index defined for Query");
+		}
 
-		Assert.notNull(indexName, "No index defined for Query");
+		SearchRequestBuilder countRequestBuilder = client.prepareSearch(query.getIndices().toArray(new String[query.getIndices().size()]));
 
-		SearchRequestBuilder countRequestBuilder = client.prepareSearch(indexName);
-
-		if (types != null) {
-			countRequestBuilder.setTypes(types);
+		if (query.getTypes() != null) {
+			countRequestBuilder.setTypes(query.getTypes().toArray(new String[query.getTypes().size()]));
 		}
 		countRequestBuilder.setSize(0);
 		return countRequestBuilder;
@@ -543,11 +588,18 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 	private UpdateRequestBuilder prepareUpdate(UpdateQuery query) {
 		String indexName = isNotBlank(query.getIndexName()) ? query.getIndexName() : getPersistentEntityFor(query.getClazz()).getIndexName();
 		String type = isNotBlank(query.getType()) ? query.getType() : getPersistentEntityFor(query.getClazz()).getIndexType();
+		if (query.getIndexName() == null) query.setIndexName(indexName);
+		if (query.getType() == null) query.setType(type);
+		// For partitioned index,document index must include partitioning key
+		if (elasticsearchPartitioner != null && elasticsearchPartitioner.isIndexPartitioned(query.getClazz())) {
+			elasticsearchPartitioner.processPartitioning(query, query.getClazz());
+		}
+
 		Assert.notNull(indexName, "No index defined for Query");
 		Assert.notNull(type, "No type define for Query");
 		Assert.notNull(query.getId(), "No Id define for Query");
 		Assert.notNull(query.getUpdateRequest(), "No IndexRequest define for Query");
-		UpdateRequestBuilder updateRequestBuilder = client.prepareUpdate(indexName, type, query.getId());
+		UpdateRequestBuilder updateRequestBuilder = client.prepareUpdate(query.getIndexName(), type, query.getId());
 		updateRequestBuilder.setRouting(query.getUpdateRequest().routing());
 
 		if (query.getUpdateRequest().script() == null) {
@@ -644,7 +696,11 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 	@Override
 	public <T> String delete(Class<T> clazz, String id) {
 		ElasticsearchPersistentEntity persistentEntity = getPersistentEntityFor(clazz);
-		return delete(persistentEntity.getIndexName(), persistentEntity.getIndexType(), id);
+		String indexName = persistentEntity.getIndexName();
+		if (elasticsearchPartitioner != null && elasticsearchPartitioner.isIndexPartitioned(clazz)) {
+			indexName = elasticsearchPartitioner.processPartitioning(id, clazz);
+		}
+		return delete(indexName, persistentEntity.getIndexType(), id);
 	}
 
 	@Override
@@ -652,6 +708,9 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 		String indexName = isNotBlank(deleteQuery.getIndex()) ? deleteQuery.getIndex() : getPersistentEntityFor(clazz).getIndexName();
 		String typeName = isNotBlank(deleteQuery.getType()) ? deleteQuery.getType() : getPersistentEntityFor(clazz).getIndexType();
+		if (elasticsearchPartitioner != null && elasticsearchPartitioner.isIndexPartitioned(clazz)) {
+			indexName = indexName+"*";
+		}
 		Integer pageSize = deleteQuery.getPageSize() != null ? deleteQuery.getPageSize() : 1000;
 		Long scrollTimeInMillis = deleteQuery.getScrollTimeInMillis() != null ? deleteQuery.getScrollTimeInMillis() : 10000l;
 
@@ -928,7 +987,25 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 	@Override
 	public <T> boolean createIndex(Class<T> clazz, Object settings) {
-		return createIndex(getPersistentEntityFor(clazz).getIndexName(), settings);
+		return createIndex(clazz, settings, getPersistentEntityFor(clazz).getIndexName());
+	}
+
+	@Override
+	public <T> boolean createIndex(Class<T> clazz, Object settings, String indexName) {
+		if (settings == null && clazz != null) {
+			if (clazz.isAnnotationPresent(Setting.class)) {
+				ElasticsearchPersistentEntity persistentEntity = getPersistentEntityFor(clazz);
+				String settingPath = persistentEntity.settingPath();
+				if (isNotBlank(settingPath)) {
+					settings = readFileFromClasspath(settingPath);
+				}
+			}
+		}
+		if (settings  == null) {
+			logger.info("@Setting has to be defined. Using default instead.");
+			settings = getDefaultSettings(getPersistentEntityFor(clazz));
+		}
+		return createIndex(indexName, settings);
 	}
 
 	private <T> Map getDefaultSettings(ElasticsearchPersistentEntity<T> persistentEntity) {
@@ -976,6 +1053,17 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 			startRecord = query.getPageable().getPageNumber() * query.getPageable().getPageSize();
 			searchRequestBuilder.setSize(query.getPageable().getPageSize());
 		}
+		if (query instanceof SearchQuery) {
+
+			searchRequestBuilder.setPreference(((SearchQuery)query).getPreference());
+
+			if (((SearchQuery)query).getFrom() > 0) {
+				startRecord = ((SearchQuery)query).getFrom();
+			}
+			if (((SearchQuery)query).getSize() > 0) {
+				searchRequestBuilder.setSize(((SearchQuery)query).getSize());
+			}
+		}
 		searchRequestBuilder.setFrom(startRecord);
 
 		if (!query.getFields().isEmpty()) {
@@ -1001,6 +1089,12 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 					.getClass())[0] : query.getIndexName();
 			String type = isBlank(query.getType()) ? retrieveTypeFromPersistentEntity(query.getObject().getClass())[0]
 					: query.getType();
+
+			// For partitioned index,document index must include partitioning key
+			if (elasticsearchPartitioner != null && elasticsearchPartitioner.isIndexPartitioned(query.getObject())) {
+				elasticsearchPartitioner.processPartitioning(query, query.getObject().getClass());
+				indexName = query.getIndexName();
+			}
 
 			IndexRequestBuilder indexRequestBuilder = null;
 
@@ -1106,10 +1200,16 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 	private void setPersistentEntityIndexAndType(Query query, Class clazz) {
 		if (query.getIndices().isEmpty()) {
-			query.addIndices(retrieveIndexNameFromPersistentEntity(clazz));
+			if (clazz != null) {
+				query.addIndices(retrieveIndexNameFromPersistentEntity(clazz));
+				if (elasticsearchPartitioner != null && elasticsearchPartitioner.isIndexPartitioned(clazz)) {
+					elasticsearchPartitioner.processPartitioning(query, clazz);
+				}
+			}
 		}
 		if (query.getTypes().isEmpty()) {
-			query.addTypes(retrieveTypeFromPersistentEntity(clazz));
+			if (clazz != null)
+				query.addTypes(retrieveTypeFromPersistentEntity(clazz));
 		}
 	}
 
@@ -1163,8 +1263,14 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 		BufferedReader bufferedReader = null;
 
 		try {
-			ClassPathResource classPathResource = new ClassPathResource(url);
-			InputStreamReader inputStreamReader = new InputStreamReader(classPathResource.getInputStream());
+			AbstractResource resource;
+			if (url.startsWith("file:")) {
+				resource = new FileSystemResource(url.substring(5));
+			}
+			else {
+				resource = new ClassPathResource(url);
+			}
+			InputStreamReader inputStreamReader = new InputStreamReader(resource.getInputStream());
 			bufferedReader = new BufferedReader(inputStreamReader);
 			String line;
 

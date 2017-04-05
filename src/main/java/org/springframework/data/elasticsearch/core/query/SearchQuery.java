@@ -49,4 +49,10 @@ public interface SearchQuery extends Query {
 
     List<ScriptField> getScriptFields();
 
+	int getFrom();
+
+	int getSize();
+
+	String getPreference();
+
 }

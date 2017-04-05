@@ -23,7 +23,7 @@
 
         <commonscollections>3.2.1</commonscollections>
         <commonslang>2.6</commonslang>
-        <elasticsearch>5.2.0</elasticsearch>
+        <elasticsearch>5.3.0</elasticsearch>
         <springdata.commons>1.14.0.BUILD-SNAPSHOT</springdata.commons>
 
     </properties>

@@ -32,17 +32,16 @@ import java.util.Map;
 
 import org.apache.lucene.search.join.ScoreMode;
 import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.index.query.InnerHitBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.elasticsearch.core.ElasticsearchTemplate;
-import org.springframework.data.elasticsearch.core.query.GetQuery;
-import org.springframework.data.elasticsearch.core.query.IndexQuery;
-import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
-import org.springframework.data.elasticsearch.core.query.SearchQuery;
+import org.springframework.data.elasticsearch.core.query.*;
 import org.springframework.data.elasticsearch.entities.Author;
 import org.springframework.data.elasticsearch.entities.Book;
 import org.springframework.data.elasticsearch.entities.Car;
@@ -383,6 +382,38 @@ public class NestedObjectTests {
 
 		assertThat(books.getContent().size(), is(1));
 		assertThat(books.getContent().get(0).getId(), is(book2.getId()));
+	}
+
+	@Test
+	public void shouldHaveInnerHitCollectionPopulated() {
+
+		final Book book1 = new Book();
+		final Book book2 = new Book();
+
+		book1.setId(randomNumeric(5));
+		book1.setName("testbook1");
+
+		book2.setId(randomNumeric(5));
+		book2.setName("testbook2");
+
+		final Person person1 = new Person();
+		person1.setName("doe");
+		person1.setId(randomNumeric(5));
+		person1.setBooks(new ArrayList<Book>());
+		person1.getBooks().add(book1);
+		person1.getBooks().add(book2);
+		IndexQuery index = new IndexQuery();
+		index.setId(person1.getId());
+		index.setObject(person1);
+		elasticsearchTemplate.index(index);
+		elasticsearchTemplate.refresh(Person.class);
+		QueryBuilder query = nestedQuery("books", QueryBuilders.termQuery("books.name", "testbook1"), ScoreMode.Total).innerHit(new InnerHitBuilder(), true);
+		List<Person> persons = elasticsearchTemplate.queryForList(new NativeSearchQuery(query), Person.class);
+
+
+		assertThat(persons.size(), is(1));
+		assertThat(persons.get(0).getTargetedBooks().size(), is(1));
+		assertThat(persons.get(0).getTargetedBooks().get(0).getId(), is(book1.getId()));
 	}
 }
 

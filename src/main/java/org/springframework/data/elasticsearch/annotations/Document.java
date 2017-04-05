@@ -48,4 +48,12 @@ public @interface Document {
 	String indexStoreType() default "fs";
 
 	boolean createIndex() default true;
+
+	String[] partitionersFields() default {};
+
+	Partitioner[] partitioners() default {};
+
+	String[] partitionersParameters() default {};
+
+	String partitionSeparator() default "_";
 }

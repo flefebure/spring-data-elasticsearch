@@ -18,11 +18,10 @@ package org.springframework.data.elasticsearch.core;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
 import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -34,6 +33,7 @@ import org.elasticsearch.action.get.MultiGetResponse;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHitField;
+import org.elasticsearch.search.SearchHits;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.elasticsearch.ElasticsearchException;
 import org.springframework.data.elasticsearch.annotations.Document;
@@ -87,6 +87,7 @@ public class DefaultResultMapper extends AbstractResultMapper {
 				} else {
 					result = mapEntity(hit.getFields().values(), clazz);
 				}
+				mapInnerHits(result, hit.getInnerHits(), clazz);
 				setPersistentEntityId(result, hit.getId(), clazz);
 				populateScriptFields(result, hit);
 				results.add(result);
@@ -181,6 +182,55 @@ public class DefaultResultMapper extends AbstractResultMapper {
 			// Only deal with text because ES generated Ids are strings !
 			if (idProperty != null && idProperty.getType().isAssignableFrom(String.class)) {
 				persistentEntity.getPropertyAccessor(result).setProperty(idProperty, id);
+			}
+		}
+	}
+
+	private <T> void mapInnerHits(T result, Map<String, SearchHits> innerHits, Class clazz) {
+		if (innerHits == null || mappingContext == null) return;
+		ElasticsearchPersistentEntity persistentEntity = mappingContext.getPersistentEntity(clazz);
+		if (persistentEntity == null || persistentEntity.innerHitsProperties() == null) return;
+		for (String path : innerHits.keySet()) {
+			if (persistentEntity.innerHitsProperties().containsKey(path)) {
+				ElasticsearchPersistentProperty innerHitProperty = (ElasticsearchPersistentProperty)persistentEntity.innerHitsProperties().get(path);
+				Collection innerCollection = null;
+				Class innerClass = null;
+				Object innerObject = null;
+				if (List.class.isAssignableFrom(innerHitProperty.getRawType())) {
+					innerCollection = new ArrayList();
+					innerClass = innerHitProperty.getTypeInformation().getComponentType().getType();
+				}
+				else if (Set.class.isAssignableFrom(innerHitProperty.getRawType())) {
+					innerCollection = new HashSet();
+					innerClass = innerHitProperty.getTypeInformation().getComponentType().getType();
+				}
+				else {
+					innerClass = innerHitProperty.getRawType();
+				}
+
+				SearchHits innerSearchHits = innerHits.get(path);
+				for (SearchHit searchHit : innerSearchHits.getHits()) {
+					innerObject = mapEntity(searchHit.getSourceAsString(), innerClass);
+					if (innerCollection != null) {
+						innerCollection.add(innerObject);
+					}
+					else
+						break;
+				}
+				Method setter = innerHitProperty.getSetter();
+				try {
+					if (innerCollection != null && !innerCollection.isEmpty()) {
+						setter.invoke(result, innerCollection);
+					}
+					else if (innerObject != null){
+						setter.invoke(result, innerObject);
+					}
+				} catch (IllegalAccessException e) {
+					e.printStackTrace();
+				} catch (InvocationTargetException e) {
+					e.printStackTrace();
+				}
+
 			}
 		}
 	}

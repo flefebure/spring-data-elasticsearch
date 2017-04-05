@@ -1971,14 +1971,14 @@ public class ElasticsearchTemplateTests {
 		String content = ElasticsearchTemplate.readFileFromClasspath(settingsFile);
 
 		// then
-		assertThat(content, is("index:\n" +
-				"  number_of_shards: 1\n" +
-				"  number_of_replicas: 0\n" +
-				"  analysis:\n" +
-				"    analyzer:\n" +
-				"      emailAnalyzer:\n" +
-				"        type: custom\n" +
-				"        tokenizer: uax_url_email\n"));
+		assertThat(content, is("index:"+System.lineSeparator() +
+				"  number_of_shards: 1"+System.lineSeparator() +
+				"  number_of_replicas: 0"+System.lineSeparator() +
+				"  analysis:"+System.lineSeparator() +
+				"    analyzer:"+System.lineSeparator() +
+				"      emailAnalyzer:"+System.lineSeparator() +
+				"        type: custom"+System.lineSeparator() +
+				"        tokenizer: uax_url_email"+System.lineSeparator()));
 	}
 
 	private IndexQuery getIndexQuery(SampleEntity sampleEntity) {

@@ -22,6 +22,7 @@ import java.util.List;
 import org.elasticsearch.action.search.SearchType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.elasticsearch.core.partition.keys.Partition;
 import org.springframework.util.Assert;
 
 /**
@@ -43,6 +44,7 @@ abstract class AbstractQuery implements Query {
 	protected Collection<String> ids;
 	protected String route;
 	protected SearchType searchType = SearchType.DFS_QUERY_THEN_FETCH;
+	private List<Partition> partitions = new ArrayList<Partition>();
 
 	@Override
 	public Sort getSort() {
@@ -148,5 +150,18 @@ abstract class AbstractQuery implements Query {
 
 	public SearchType getSearchType() {
 		return searchType;
+	}
+
+
+	public void setPartitions(List<Partition> partitions ) {
+		this.partitions = partitions;
+	}
+
+	public List<Partition> getPartitions() {
+		return partitions;
+	}
+
+	public void withPartition(Partition partition) {
+		this.partitions.add(partition);
 	}
 }
