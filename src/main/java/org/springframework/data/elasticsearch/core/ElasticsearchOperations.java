@@ -71,6 +71,8 @@ public interface ElasticsearchOperations {
 	 */
 	boolean createIndex(String indexName, Object settings);
 
+	public boolean createIndex(String indexName, Object settings, Class... mappings);
+
 	/**
 	 * Create an index for given class and Settings
 	 *

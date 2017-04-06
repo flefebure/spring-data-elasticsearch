@@ -15,20 +15,6 @@
  */
 package org.springframework.data.elasticsearch.core;
 
-import static org.apache.commons.lang.StringUtils.isNotBlank;
-import static org.apache.commons.lang.StringUtils.isBlank;
-import static org.elasticsearch.client.Requests.*;
-import static org.elasticsearch.index.VersionType.*;
-import static org.elasticsearch.index.query.QueryBuilders.moreLikeThisQuery;
-import static org.elasticsearch.index.query.QueryBuilders.wrapperQuery;
-import static org.springframework.data.elasticsearch.core.MappingBuilder.*;
-import static org.springframework.util.CollectionUtils.isEmpty;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.util.*;
-
 import org.elasticsearch.action.ListenableActionFuture;
 import org.elasticsearch.action.admin.indices.alias.IndicesAliasesRequest;
 import org.elasticsearch.action.admin.indices.alias.get.GetAliasesRequest;
@@ -37,12 +23,9 @@ import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.admin.indices.mapping.get.GetMappingsRequest;
 import org.elasticsearch.action.admin.indices.mapping.put.PutMappingRequestBuilder;
 import org.elasticsearch.action.admin.indices.settings.get.GetSettingsRequest;
-import org.elasticsearch.action.bulk.BulkAction;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
-import org.elasticsearch.action.delete.DeleteAction;
-import org.elasticsearch.action.delete.DeleteRequestBuilder;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.get.MultiGetRequest;
 import org.elasticsearch.action.get.MultiGetRequestBuilder;
@@ -76,7 +59,10 @@ import org.springframework.context.ApplicationContextAware;
 import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.elasticsearch.ElasticsearchException;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Mapping;
@@ -93,6 +79,21 @@ import org.springframework.data.elasticsearch.core.query.*;
 import org.springframework.data.mapping.PersistentProperty;
 import org.springframework.data.util.CloseableIterator;
 import org.springframework.util.Assert;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.*;
+
+import static org.apache.commons.lang.StringUtils.isBlank;
+import static org.apache.commons.lang.StringUtils.isNotBlank;
+import static org.elasticsearch.client.Requests.indicesExistsRequest;
+import static org.elasticsearch.client.Requests.refreshRequest;
+import static org.elasticsearch.index.VersionType.EXTERNAL;
+import static org.elasticsearch.index.query.QueryBuilders.moreLikeThisQuery;
+import static org.elasticsearch.index.query.QueryBuilders.wrapperQuery;
+import static org.springframework.data.elasticsearch.core.MappingBuilder.buildMapping;
+import static org.springframework.util.CollectionUtils.isEmpty;
 
 /**
  * ElasticsearchTemplate
@@ -182,6 +183,11 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 	@Override
 	public <T> boolean putMapping(Class<T> clazz, Object mappings, String indexName) {
 		ElasticsearchPersistentEntity<T> persistentEntity = getPersistentEntityFor(clazz);
+		mappings = buildMappings(clazz, persistentEntity, mappings);
+		return putMapping(indexName, persistentEntity.getIndexType(), mappings);
+	}
+
+	public <T> Object buildMappings(Class<T> clazz, ElasticsearchPersistentEntity<T> persistentEntity, Object mappings) {
 		if (mappings == null) {
 			if (clazz.isAnnotationPresent(Mapping.class)) {
 				String mappingPath = clazz.getAnnotation(Mapping.class).mappingPath();
@@ -200,8 +206,8 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 				}
 			}
 		}
+		return  mappings;
 
-		return putMapping(indexName, persistentEntity.getIndexType(), mappings);
 	}
 
 	@Override
@@ -1023,6 +1029,11 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 	@Override
 	public boolean createIndex(String indexName, Object settings) {
+		return createIndex(indexName, settings, null);
+	}
+
+	@Override
+	public boolean createIndex(String indexName, Object settings, Class... mappingsAtCreation) {
 		CreateIndexRequestBuilder createIndexRequestBuilder = client.admin().indices().prepareCreate(indexName);
 		if (settings instanceof String) {
 			createIndexRequestBuilder.setSettings(String.valueOf(settings));
@@ -1031,6 +1042,20 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 		} else if (settings instanceof XContentBuilder) {
 			createIndexRequestBuilder.setSettings((XContentBuilder) settings);
 		}
+		if (mappingsAtCreation.length > 0) {
+			for (Class mappedClass : mappingsAtCreation) {
+				ElasticsearchPersistentEntity persistentEntity = getPersistentEntityFor(mappedClass);
+				Object mapping = buildMappings(mappedClass, persistentEntity, null);
+				if (mapping instanceof String) {
+					createIndexRequestBuilder.addMapping(persistentEntity.getIndexType(), (String)mapping);
+				} else if (mapping instanceof Map) {
+					createIndexRequestBuilder.addMapping(persistentEntity.getIndexType(),(Map) mapping);
+				} else if (mapping instanceof XContentBuilder) {
+					createIndexRequestBuilder.addMapping(persistentEntity.getIndexType(), (XContentBuilder) mapping);
+				}
+			}
+		}
+
 		return createIndexRequestBuilder.execute().actionGet().isAcknowledged();
 	}
 
@@ -1043,6 +1068,7 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 	@Override
 	public <T> boolean createIndex(Class<T> clazz, Object settings, String indexName) {
+		Class[] mappingsAtcreation = {};
 		if (settings == null && clazz != null) {
 			if (clazz.isAnnotationPresent(Setting.class)) {
 				ElasticsearchPersistentEntity persistentEntity = getPersistentEntityFor(clazz);
@@ -1050,13 +1076,14 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 				if (isNotBlank(settingPath)) {
 					settings = readFileFromClasspath(settingPath);
 				}
+				mappingsAtcreation = persistentEntity.mappingsAtCreation();
 			}
 		}
 		if (settings  == null) {
 			logger.info("@Setting has to be defined. Using default instead.");
 			settings = getDefaultSettings(getPersistentEntityFor(clazz));
 		}
-		return createIndex(indexName, settings);
+		return createIndex(indexName, settings, mappingsAtcreation);
 	}
 
 	private <T> Map getDefaultSettings(ElasticsearchPersistentEntity<T> persistentEntity) {

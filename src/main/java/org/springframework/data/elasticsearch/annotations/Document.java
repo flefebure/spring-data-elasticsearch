@@ -56,4 +56,6 @@ public @interface Document {
 	String[] partitionersParameters() default {};
 
 	String partitionSeparator() default "_";
+
+	Class[] mappingsAtCreation() default {};
 }

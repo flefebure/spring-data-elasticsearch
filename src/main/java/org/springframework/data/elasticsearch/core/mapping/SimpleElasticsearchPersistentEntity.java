@@ -67,6 +67,7 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 	private String partitionSeparator;
 	private ElasticsearchPartitioner indexPartitioner;
 	Map<String, ElasticsearchPersistentProperty> innerHitsProperties;
+	private Class[] mappingsAtCreation;
 
 	public SimpleElasticsearchPersistentEntity(TypeInformation<T> typeInformation) {
 		super(typeInformation);
@@ -91,6 +92,7 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 			this.partitioners = typeInformation.getType().getAnnotation(Document.class).partitioners();
 			this.partitionersParameters = typeInformation.getType().getAnnotation(Document.class).partitionersParameters();
 			this.partitionSeparator = typeInformation.getType().getAnnotation(Document.class).partitionSeparator();
+			this.mappingsAtCreation = document.mappingsAtCreation();
 		}
 		if (clazz.isAnnotationPresent(Setting.class)) {
 			this.settingPath = typeInformation.getType().getAnnotation(Setting.class).settingPath();
@@ -227,5 +229,10 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 	@Override
 	public Map<String, ElasticsearchPersistentProperty> innerHitsProperties() {
 		return innerHitsProperties;
+	}
+
+	@Override
+	public Class[] mappingsAtCreation() {
+		return mappingsAtCreation;
 	}
 }

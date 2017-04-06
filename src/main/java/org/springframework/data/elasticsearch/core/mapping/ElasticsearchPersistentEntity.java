@@ -51,6 +51,8 @@ public interface ElasticsearchPersistentEntity<T> extends PersistentEntity<T, El
 
 	String settingPath();
 
+	Class[] mappingsAtCreation();
+
 	boolean isCreateIndexAndMapping();
 
 	String[] getPartitionersFields();
