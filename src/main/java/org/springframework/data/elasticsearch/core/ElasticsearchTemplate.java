@@ -37,9 +37,12 @@ import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.admin.indices.mapping.get.GetMappingsRequest;
 import org.elasticsearch.action.admin.indices.mapping.put.PutMappingRequestBuilder;
 import org.elasticsearch.action.admin.indices.settings.get.GetSettingsRequest;
+import org.elasticsearch.action.bulk.BulkAction;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.delete.DeleteAction;
+import org.elasticsearch.action.delete.DeleteRequestBuilder;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.get.MultiGetRequest;
 import org.elasticsearch.action.get.MultiGetRequestBuilder;
@@ -620,11 +623,21 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 	@Override
 	public void bulkIndex(List<IndexQuery> queries) {
+		bulkIndex(queries, 0);
+	}
+
+	@Override
+	public void bulkIndex(List<IndexQuery> queries, int timeoutMs) {
 		BulkRequestBuilder bulkRequest = client.prepareBulk();
 		for (IndexQuery query : queries) {
 			bulkRequest.add(prepareIndex(query));
 		}
-		BulkResponse bulkResponse = bulkRequest.execute().actionGet();
+		BulkResponse bulkResponse = null;
+		if (timeoutMs > 0)
+			bulkResponse = bulkRequest.execute().actionGet(timeoutMs);
+		else
+			bulkResponse = bulkRequest.execute().actionGet();
+
 		if (bulkResponse.hasFailures()) {
 			Map<String, String> failedDocuments = new HashMap<String, String>();
 			for (BulkItemResponse item : bulkResponse.getItems()) {
@@ -640,11 +653,22 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 	@Override
 	public void bulkUpdate(List<UpdateQuery> queries) {
+		bulkUpdate(queries, 0);
+	}
+
+
+	@Override
+	public void bulkUpdate(List<UpdateQuery> queries, int timeoutMs) {
 		BulkRequestBuilder bulkRequest = client.prepareBulk();
 		for (UpdateQuery query : queries) {
 			bulkRequest.add(prepareUpdate(query));
 		}
-		BulkResponse bulkResponse = bulkRequest.execute().actionGet();
+		BulkResponse bulkResponse = null;
+		if (timeoutMs > 0)
+			bulkResponse = bulkRequest.execute().actionGet(timeoutMs);
+		else
+			bulkResponse = bulkRequest.execute().actionGet();
+
 		if (bulkResponse.hasFailures()) {
 			Map<String, String> failedDocuments = new HashMap<String, String>();
 			for (BulkItemResponse item : bulkResponse.getItems()) {
@@ -769,6 +793,42 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 		DeleteQuery deleteQuery = new DeleteQuery();
 		deleteQuery.setQuery(elasticsearchQuery);
 		delete(deleteQuery, clazz);
+	}
+
+	@Override
+	public void bulkDelete(Map<String, Class> entities) {
+		bulkDelete(entities, 0);
+	}
+
+	@Override
+	public void bulkDelete(Map<String, Class> entities, int timeoutMs) {
+		BulkRequestBuilder bulkRequest = client.prepareBulk();
+		for (String id : entities.keySet()) {
+			Class clazz = entities.get(id);
+			ElasticsearchPersistentEntity persistentEntity = getPersistentEntityFor(clazz);
+			String indexName = persistentEntity.getIndexName();
+			if (elasticsearchPartitioner != null && elasticsearchPartitioner.isIndexPartitioned(clazz)) {
+				indexName = elasticsearchPartitioner.processPartitioning(id, clazz);
+			}
+			bulkRequest.add(client.prepareDelete(indexName, persistentEntity.getIndexType(), id));
+		}
+
+		BulkResponse bulkResponse = null;
+		if (timeoutMs > 0)
+			bulkResponse = bulkRequest.execute().actionGet(timeoutMs);
+		else
+			bulkResponse = bulkRequest.execute().actionGet();
+		if (bulkResponse.hasFailures()) {
+			Map<String, String> failedDocuments = new HashMap<String, String>();
+			for (BulkItemResponse item : bulkResponse.getItems()) {
+				if (item.isFailed())
+					failedDocuments.put(item.getId(), item.getFailureMessage());
+			}
+			throw new ElasticsearchException(
+					"Bulk deleting has failures. Use ElasticsearchException.getFailedDocuments() for detailed messages ["
+							+ failedDocuments + "]", failedDocuments
+			);
+		}
 	}
 
 	private <T> SearchRequestBuilder prepareScroll(Query query, long scrollTimeInMillis, boolean noFields, Class<T> clazz) {

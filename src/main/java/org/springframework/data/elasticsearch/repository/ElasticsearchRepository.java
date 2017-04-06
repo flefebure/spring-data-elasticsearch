@@ -45,4 +45,10 @@ public interface ElasticsearchRepository<T, ID extends Serializable> extends Ela
 	void refresh();
 
 	Class<T> getEntityClass();
+
+	<S extends T> Iterable<S> save(Iterable<S> entities, boolean refresh);
+
+	<S extends T> Iterable<S> save(Iterable<S> entities, boolean refresh, int timeoutMs);
+
+
 }

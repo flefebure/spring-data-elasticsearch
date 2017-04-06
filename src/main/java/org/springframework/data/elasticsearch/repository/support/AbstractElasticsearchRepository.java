@@ -173,13 +173,24 @@ public abstract class AbstractElasticsearchRepository<T, ID extends Serializable
 
 	@Override
 	public <S extends T> Iterable<S> save(Iterable<S> entities) {
+		return save(entities, true);
+	}
+
+	@Override
+	public <S extends T> Iterable<S> save(Iterable<S> entities, boolean refresh) {
+		return save(entities, true, 0);
+	}
+
+	@Override
+	public <S extends T> Iterable<S> save(Iterable<S> entities, boolean refresh, int timeoutMs) {
 		Assert.notNull(entities, "Cannot insert 'null' as a List.");
 		List<IndexQuery> queries = new ArrayList<IndexQuery>();
 		for (S s : entities) {
 			queries.add(createIndexQuery(s));
 		}
-		elasticsearchOperations.bulkIndex(queries);
-		elasticsearchOperations.refresh(entityInformation.getIndexName());
+		elasticsearchOperations.bulkIndex(queries, timeoutMs);
+		if (refresh)
+			elasticsearchOperations.refresh(entityInformation.getIndexName());
 		return entities;
 	}
 

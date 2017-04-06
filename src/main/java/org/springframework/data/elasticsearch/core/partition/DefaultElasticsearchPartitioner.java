@@ -47,6 +47,9 @@ public class DefaultElasticsearchPartitioner implements ElasticsearchPartitioner
 
         String partitionKey = extractKeyFromId(id, persistentEntity);
         String partitionName = indexName+sep+partitionKey;
+
+        createPartitionIfNotExists(clazz, persistentEntity.getIndexType(), indexName, partitionName);
+
         return partitionName;
     }
 
