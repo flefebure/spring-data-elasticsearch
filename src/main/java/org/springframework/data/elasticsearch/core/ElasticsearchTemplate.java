@@ -1018,18 +1018,7 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 	}
 
 	private <T> boolean createIndexWithSettings(Class<T> clazz) {
-		if (clazz.isAnnotationPresent(Setting.class)) {
-			String settingPath = clazz.getAnnotation(Setting.class).settingPath();
-			if (isNotBlank(settingPath)) {
-				String settings = readFileFromClasspath(settingPath);
-				if (isNotBlank(settings)) {
-					return createIndex(getPersistentEntityFor(clazz).getIndexName(), settings);
-				}
-			} else {
-				logger.info("settingPath in @Setting has to be defined. Using default instead.");
-			}
-		}
-		return createIndex(getPersistentEntityFor(clazz).getIndexName(), getDefaultSettings(getPersistentEntityFor(clazz)));
+		return createIndex(clazz, null);
 	}
 
 	@Override
@@ -1044,6 +1033,8 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 		}
 		return createIndexRequestBuilder.execute().actionGet().isAcknowledged();
 	}
+
+
 
 	@Override
 	public <T> boolean createIndex(Class<T> clazz, Object settings) {
