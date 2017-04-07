@@ -50,5 +50,6 @@ public interface ElasticsearchRepository<T, ID extends Serializable> extends Ela
 
 	<S extends T> Iterable<S> save(Iterable<S> entities, boolean refresh, int timeoutMs);
 
+	public void delete(ID id, String parentId);
 
 }

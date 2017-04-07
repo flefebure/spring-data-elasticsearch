@@ -421,10 +421,20 @@ public interface ElasticsearchOperations {
 	 * @param indexName
 	 * @param type
 	 * @param id
+	 * @param parentId
+	 * @return documentId of the document deleted
+	 */
+	String delete(String indexName, String type, String id, String parentId);
+
+	/**
+	 * Delete the one object with provided id
+	 *
+	 * @param indexName
+	 * @param type
+	 * @param id
 	 * @return documentId of the document deleted
 	 */
 	String delete(String indexName, String type, String id);
-
 
 	/**
 	 * Delete all records matching the criteria
@@ -440,8 +450,15 @@ public interface ElasticsearchOperations {
 	 * @param id
 	 * @return documentId of the document deleted
 	 */
+	<T> String delete(Class<T> clazz, String id, String parentId);
+	/**
+	 * Delete the one object with provided id
+	 *
+	 * @param clazz
+	 * @param id
+	 * @return documentId of the document deleted
+	 */
 	<T> String delete(Class<T> clazz, String id);
-
 	/**
 	 * Delete all records matching the query
 	 *
@@ -457,9 +474,19 @@ public interface ElasticsearchOperations {
 	 */
 	void delete(DeleteQuery query);
 
-	public void bulkDelete(Map<String, Class> entities);
+	/**
+	 * Delete all records
+	 *
+	 * @param deleteQueries
+	 */
+	public void bulkDelete(List<DeleteById> deleteQueries);
 
-	public void bulkDelete(Map<String, Class> entities, int timeoutMs);
+	/**
+	 * Delete all records with a timeout
+	 *
+	 * @param timeoutMs
+	 */
+	public void bulkDelete(List<DeleteById> deleteQueries, int timeoutMs);
 
 	/**
 	 * Deletes an index for given entity

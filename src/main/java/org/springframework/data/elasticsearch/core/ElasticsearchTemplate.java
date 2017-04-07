@@ -26,6 +26,7 @@ import org.elasticsearch.action.admin.indices.settings.get.GetSettingsRequest;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.delete.DeleteRequestBuilder;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.get.MultiGetRequest;
 import org.elasticsearch.action.get.MultiGetRequestBuilder;
@@ -719,18 +720,28 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 	}
 
 	@Override
-	public String delete(String indexName, String type, String id) {
-		return client.prepareDelete(indexName, type, id).execute().actionGet().getId();
+	public String delete(String indexName, String type, String id, String parentId) {
+		return client.prepareDelete(indexName, type, id).setParent(parentId).execute().actionGet().getId();
 	}
 
 	@Override
-	public <T> String delete(Class<T> clazz, String id) {
+	public String delete(String indexName, String type, String id) {
+		return delete(indexName, type, id, null);
+	}
+
+	@Override
+	public <T> String delete(Class<T> clazz, String id, String parentId) {
 		ElasticsearchPersistentEntity persistentEntity = getPersistentEntityFor(clazz);
 		String indexName = persistentEntity.getIndexName();
 		if (elasticsearchPartitioner != null && elasticsearchPartitioner.isIndexPartitioned(clazz)) {
 			indexName = elasticsearchPartitioner.processPartitioning(id, clazz);
 		}
-		return delete(indexName, persistentEntity.getIndexType(), id);
+		return delete(indexName, persistentEntity.getIndexType(), id, parentId);
+	}
+
+	@Override
+	public <T> String delete(Class<T> clazz, String id) {
+		return delete(clazz, id, null);
 	}
 
 	@Override
@@ -802,21 +813,28 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 	}
 
 	@Override
-	public void bulkDelete(Map<String, Class> entities) {
-		bulkDelete(entities, 0);
+	public void bulkDelete(List<DeleteById> deleteQueries) {
+		bulkDelete(deleteQueries, 0);
 	}
 
+
+
 	@Override
-	public void bulkDelete(Map<String, Class> entities, int timeoutMs) {
+	public void bulkDelete(List<DeleteById> deleteQueries, int timeoutMs) {
 		BulkRequestBuilder bulkRequest = client.prepareBulk();
-		for (String id : entities.keySet()) {
-			Class clazz = entities.get(id);
-			ElasticsearchPersistentEntity persistentEntity = getPersistentEntityFor(clazz);
-			String indexName = persistentEntity.getIndexName();
-			if (elasticsearchPartitioner != null && elasticsearchPartitioner.isIndexPartitioned(clazz)) {
-				indexName = elasticsearchPartitioner.processPartitioning(id, clazz);
+		for (DeleteById deleteQuery : deleteQueries) {
+			DeleteRequestBuilder requestBuilder = client.prepareDelete()
+					.setId(deleteQuery.getId())
+					.setType(deleteQuery.getType())
+					.setParent(deleteQuery.getParent());
+
+			String indexName = deleteQuery.getIndex();
+			if (deleteQuery.getClazz() != null && elasticsearchPartitioner != null && elasticsearchPartitioner.isIndexPartitioned(deleteQuery.getClazz())) {
+				indexName = elasticsearchPartitioner.processPartitioning(deleteQuery.getId(), deleteQuery.getClazz());
 			}
-			bulkRequest.add(client.prepareDelete(indexName, persistentEntity.getIndexType(), id));
+			requestBuilder.setIndex(indexName);
+
+			bulkRequest.add(requestBuilder);
 		}
 
 		BulkResponse bulkResponse = null;

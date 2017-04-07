@@ -30,18 +30,10 @@ public class DeleteQuery {
 	private String type;
 	private Integer pageSize;
 	private Long scrollTimeInMillis;
-	private String id;
+
 
 	public QueryBuilder getQuery() {
 		return query;
-	}
-
-	public String getId() {
-		return id;
-	}
-
-	public void setId(String id) {
-		this.id = id;
 	}
 
 	public void setQuery(QueryBuilder query) {
