@@ -264,7 +264,7 @@ public interface ElasticsearchOperations {
 	 * @since 1.3
 	 */
 	<T> CloseableIterator<T> stream(SearchQuery query, Class<T> clazz);
-
+	<T> CloseableIterator<T> stream(long scrollTimeInMillis, SearchQuery query, Class<T> clazz);
 	/**
 	 * Executes the given {@link SearchQuery} against elasticsearch and return result as {@link CloseableIterator} using custom mapper.
 	 * <p>
