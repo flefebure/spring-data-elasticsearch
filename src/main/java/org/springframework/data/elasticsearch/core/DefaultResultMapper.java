@@ -16,6 +16,8 @@
 package org.springframework.data.elasticsearch.core;
 
 
+import java.beans.IntrospectionException;
+import java.beans.PropertyDescriptor;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -192,42 +194,46 @@ public class DefaultResultMapper extends AbstractResultMapper {
 		if (persistentEntity == null || persistentEntity.innerHitsProperties() == null) return;
 		for (String path : innerHits.keySet()) {
 			if (persistentEntity.innerHitsProperties().containsKey(path)) {
-				ElasticsearchPersistentProperty innerHitProperty = (ElasticsearchPersistentProperty)persistentEntity.innerHitsProperties().get(path);
-				Collection innerCollection = null;
-				Class innerClass = null;
-				Object innerObject = null;
-				if (List.class.isAssignableFrom(innerHitProperty.getRawType())) {
-					innerCollection = new ArrayList();
-					innerClass = innerHitProperty.getTypeInformation().getComponentType().getType();
-				}
-				else if (Set.class.isAssignableFrom(innerHitProperty.getRawType())) {
-					innerCollection = new HashSet();
-					innerClass = innerHitProperty.getTypeInformation().getComponentType().getType();
-				}
-				else {
-					innerClass = innerHitProperty.getRawType();
-				}
-
-				SearchHits innerSearchHits = innerHits.get(path);
-				for (SearchHit searchHit : innerSearchHits.getHits()) {
-					innerObject = mapEntity(searchHit.getSourceAsString(), innerClass);
-					if (innerCollection != null) {
-						innerCollection.add(innerObject);
-					}
-					else
-						break;
-				}
-				Method setter = innerHitProperty.getSetter();
 				try {
+					ElasticsearchPersistentProperty innerHitProperty = (ElasticsearchPersistentProperty) persistentEntity.innerHitsProperties().get(path);
+
+					// On va chercher le type sur le getter car dans certains cas il peut etre utile que la propriété soit un Object
+					Method getter = new PropertyDescriptor(innerHitProperty.getFieldName(), persistentEntity.getType()).getReadMethod();
+					Class innerHitType = getter.getReturnType();
+
+					Collection innerCollection = null;
+					Class innerClass = null;
+					Object innerObject = null;
+					if (List.class.isAssignableFrom(innerHitType)) {
+						innerCollection = new ArrayList();
+						innerClass = innerHitProperty.getTypeInformation().getComponentType().getType();
+					} else if (Set.class.isAssignableFrom(innerHitType)) {
+						innerCollection = new HashSet();
+						innerClass = innerHitProperty.getTypeInformation().getComponentType().getType();
+					} else {
+						innerClass = innerHitType;
+					}
+
+					SearchHits innerSearchHits = innerHits.get(path);
+					for (SearchHit searchHit : innerSearchHits.getHits()) {
+						innerObject = mapEntity(searchHit.getSourceAsString(), innerClass);
+						if (innerCollection != null) {
+							innerCollection.add(innerObject);
+						} else
+							break;
+					}
+					Method setter = new PropertyDescriptor(innerHitProperty.getFieldName(), persistentEntity.getType()).getWriteMethod();
+
 					if (innerCollection != null && !innerCollection.isEmpty()) {
 						setter.invoke(result, innerCollection);
-					}
-					else if (innerObject != null){
+					} else if (innerObject != null) {
 						setter.invoke(result, innerObject);
 					}
 				} catch (IllegalAccessException e) {
 					e.printStackTrace();
 				} catch (InvocationTargetException e) {
+					e.printStackTrace();
+				} catch (IntrospectionException e) {
 					e.printStackTrace();
 				}
 

@@ -98,10 +98,10 @@ public class ParentEntity {
 
 		@JsonIgnore
 		@InnerHits(path = "parent-entity")
-		private ParentEntity parent;
+		private Object parent;
 		@JsonIgnore
 		public ParentEntity getParent() {
-			return parent;
+			return (ParentEntity)parent;
 		}
 		@JsonIgnore
 		public void setParent(ParentEntity parent) {

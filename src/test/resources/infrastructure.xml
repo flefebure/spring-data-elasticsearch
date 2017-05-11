@@ -10,7 +10,7 @@
                                <!--path-configuration="node-client-configuration.yml"/>-->
 
     <!-- ip4 -->
-    <elasticsearch:transport-client id="client" cluster-name="elasticsearch-demo" cluster-nodes="192.168.50.40:9300" />
+    <elasticsearch:transport-client id="client" cluster-name="mig5" cluster-nodes="elastic2.local:9300" />
 
     <!-- ip6 -->
     <!--<elasticsearch:transport-client id="client" cluster-name="elasticsearch" cluster-nodes="[::1]:9300" />-->
