@@ -193,10 +193,21 @@ public class DefaultResultMapper extends AbstractResultMapper {
 		ElasticsearchPersistentEntity persistentEntity = mappingContext.getPersistentEntity(clazz);
 		if (persistentEntity == null || persistentEntity.innerHitsProperties() == null) return;
 		for (String path : innerHits.keySet()) {
-			if (persistentEntity.innerHitsProperties().containsKey(path)) {
-				try {
-					ElasticsearchPersistentProperty innerHitProperty = (ElasticsearchPersistentProperty) persistentEntity.innerHitsProperties().get(path);
+			ElasticsearchPersistentProperty innerHitProperty = null;
+			for (Object k : persistentEntity.innerHitsProperties().keySet()) {
+				String key = (String)k;
+				if (key.endsWith("*")) {
+					String prefix = key.substring(0, key.length()-1);
+					if (path.startsWith(prefix)) {
+						innerHitProperty = (ElasticsearchPersistentProperty) persistentEntity.innerHitsProperties().get(key);
+					}
+				}
+				else if (key.equals(path))
+					innerHitProperty = (ElasticsearchPersistentProperty) persistentEntity.innerHitsProperties().get(key);
+			}
 
+			if (innerHitProperty != null) {
+				try {
 					// On va chercher le type sur le getter car dans certains cas il peut etre utile que la propriété soit un Object
 					Method getter = new PropertyDescriptor(innerHitProperty.getFieldName(), persistentEntity.getType()).getReadMethod();
 					Class innerHitType = getter.getReturnType();
@@ -205,11 +216,13 @@ public class DefaultResultMapper extends AbstractResultMapper {
 					Class innerClass = null;
 					Object innerObject = null;
 					if (List.class.isAssignableFrom(innerHitType)) {
-						innerCollection = new ArrayList();
+						innerCollection = (Collection)getter.invoke(result, new Object[]{});
+						if (innerCollection == null) innerCollection = new ArrayList();
 						innerClass = innerHitProperty.getTypeInformation().getComponentType().getType();
 					} else if (Set.class.isAssignableFrom(innerHitType)) {
-						innerCollection = new HashSet();
+						innerCollection = (Collection)getter.invoke(result, new Object[]{});
 						innerClass = innerHitProperty.getTypeInformation().getComponentType().getType();
+						if (innerCollection == null) innerCollection = new HashSet();
 					} else {
 						innerClass = innerHitType;
 					}
