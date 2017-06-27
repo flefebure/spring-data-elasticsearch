@@ -65,7 +65,7 @@ public class PartitionBoundariesTest {
         boundaries.add(dateBoundary);
         String[] partitions = new String[]{"creationDate"};
         Partitioner[] strategies = new Partitioner[]{Partitioner.date_range};
-        String[] parameters = new String[]{"YYYYMM"};
+        String[] parameters = new String[]{"yyyyMM"};
         List<String> slices = Partition.getPartitions(boundaries,partitions,strategies,parameters,"_");
         Assert.assertEquals(3, slices.size());
         Assert.assertTrue(slices.contains("201503"));
@@ -92,7 +92,7 @@ public class PartitionBoundariesTest {
         boundaries.add(dateBoundary);
         String[] partitions = new String[]{"creationDate"};
         Partitioner[] strategies = new Partitioner[]{Partitioner.date_range};
-        String[] parameters = new String[]{"YYYYMMdd"};
+        String[] parameters = new String[]{"yyyyMMdd"};
         List<String> slices = Partition.getPartitions(boundaries,partitions,strategies,parameters,"_");
         Assert.assertEquals(3, slices.size());
         Assert.assertTrue(slices.contains("20150805"));
@@ -113,7 +113,7 @@ public class PartitionBoundariesTest {
         boundaries.add(dateBoundary);
         String[] partitions = new String[]{"customer","creationDate"};
         Partitioner[] strategies = new Partitioner[]{Partitioner.fixed_string, Partitioner.date_range};
-        String[] parameters = new String[]{"","YYYYMM"};
+        String[] parameters = new String[]{"","yyyyMM"};
         List<String> slices = Partition.getPartitions(boundaries,partitions,strategies,parameters,"_");
         Assert.assertEquals(6, slices.size());
         Assert.assertTrue(slices.contains("johndoe_201503"));

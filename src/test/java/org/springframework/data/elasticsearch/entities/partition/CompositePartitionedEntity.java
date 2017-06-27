@@ -28,7 +28,7 @@ import java.util.Date;
  * @author FRanck Lefebure
  */
 @Document(indexName = "index", type = "type", shards = 1,
-		replicas = 0, refreshInterval = "-1", partitionersFields = {"customerId","creationDate"}, partitioners = {Partitioner.fixed_string, Partitioner.date_range}, partitionersParameters = {"","YYYYMM"})
+		replicas = 0, refreshInterval = "-1", partitionersFields = {"customerId","creationDate"}, partitioners = {Partitioner.fixed_string, Partitioner.date_range}, partitionersParameters = {"","yyyyMM"})
 public class CompositePartitionedEntity {
 
 	@Id

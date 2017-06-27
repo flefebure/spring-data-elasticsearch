@@ -58,15 +58,15 @@ public class DatePartition extends org.springframework.data.elasticsearch.core.p
         DateTimeFormatter newSdf = DateTimeFormatter.ofPattern(pattern);
         LocalDateTime slice = null;
         ChronoUnit unit = null;
-        if (pattern.equals("YYYYMMddHH")) {
+        if (pattern.equals("YYYYMMddHH") || pattern.equals("yyyyMMddHH")) {
             slice = LocalDateTime.of(startTime.getYear(), startTime.getMonth(), startTime.getDayOfMonth(), startTime.getHour(), 0);
             unit = ChronoUnit.HOURS;
         }
-        else if (pattern.equals("YYYYMMdd")) {
+        else if (pattern.equals("YYYYMMdd") || pattern.equals("yyyyMMdd")) {
             slice = LocalDateTime.of(startTime.getYear(), startTime.getMonth(), startTime.getDayOfMonth(), 0, 0);
             unit = ChronoUnit.DAYS;
         }
-        else if (pattern.equals("YYYYMM")) {
+        else if (pattern.equals("YYYYMM") || pattern.equals("yyyyMM")) {
             slice = LocalDateTime.of(startTime.getYear(), startTime.getMonth(), 1, 0, 0);
             unit = ChronoUnit.MONTHS;
         }
