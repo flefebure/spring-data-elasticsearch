@@ -36,7 +36,7 @@ import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.aggregations.Aggregations;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
-import org.elasticsearch.search.internal.InternalSearchHitField;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
@@ -54,6 +54,7 @@ import org.springframework.data.elasticsearch.entities.Car;
  * @author Artur Konczak
  * @author Mohsin Husen
  */
+@SuppressWarnings("JavadocReference")
 public class DefaultResultMapperTests {
 
 	private DefaultResultMapper resultMapper;
@@ -189,8 +190,8 @@ public class DefaultResultMapperTests {
 
 	private Map<String, SearchHitField> createCarFields(String name, String model) {
 		Map<String, SearchHitField> result = new HashMap<String, SearchHitField>();
-		result.put("name", new InternalSearchHitField("name", Arrays.<Object>asList(name)));
-		result.put("model", new InternalSearchHitField("model", Arrays.<Object>asList(model)));
+		result.put("name", new SearchHitField("name", Arrays.<Object>asList(name)));
+		result.put("model", new SearchHitField("model", Arrays.<Object>asList(model)));
 		return result;
 	}
 	
