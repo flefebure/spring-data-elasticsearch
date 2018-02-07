@@ -84,6 +84,7 @@ import org.springframework.data.util.CloseableIterator;
 import org.springframework.util.Assert;
 import org.springframework.util.ReflectionUtils;
 
+import java.beans.PropertyDescriptor;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -1217,10 +1218,9 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 				if (persistentEntity.getJoinProperty() != null && persistentEntity.getJoinRoutingField() != null) {
 					Object joinField = persistentEntity.getPropertyAccessor(query.getObject()).getProperty(persistentEntity.getJoinProperty());
 					try {
-						java.lang.reflect.Field routingField = joinField.getClass().getField(persistentEntity.getJoinRoutingField());
-						String routing = (String)ReflectionUtils.getField(routingField, joinField);
-						if (routing != null) {
-							indexRequestBuilder.setRouting(routing);
+						Object routing = new PropertyDescriptor(persistentEntity.getJoinRoutingField(), joinField.getClass()).getReadMethod().invoke(joinField);
+						if (routing != null && routing instanceof String) {
+							indexRequestBuilder.setRouting((String)routing);
 						}
 					} catch (Exception e) {
 						logger.warn(e.getMessage(),e);
