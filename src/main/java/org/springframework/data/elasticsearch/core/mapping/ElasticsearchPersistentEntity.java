@@ -66,4 +66,8 @@ public interface ElasticsearchPersistentEntity<T> extends PersistentEntity<T, El
 	String getPartitionSeparator();
 
 	String getIndexName(T entity);
+
+	ElasticsearchPersistentProperty getJoinProperty();
+
+	String getJoinRoutingField();
 }

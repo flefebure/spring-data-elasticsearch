@@ -54,7 +54,9 @@ import org.elasticsearch.search.sort.SortOrder;
 import org.elasticsearch.search.suggest.SuggestBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.BeansException;
+import org.springframework.beans.PropertyAccessorUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.core.io.AbstractResource;
@@ -80,10 +82,12 @@ import org.springframework.data.elasticsearch.core.query.*;
 import org.springframework.data.mapping.PersistentProperty;
 import org.springframework.data.util.CloseableIterator;
 import org.springframework.util.Assert;
+import org.springframework.util.ReflectionUtils;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.reflect.*;
 import java.util.*;
 
 import static org.apache.commons.lang.StringUtils.isBlank;
@@ -1208,6 +1212,19 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 					indexRequestBuilder = client.prepareIndex(indexName, type);
 				}
 				indexRequestBuilder.setSource(resultsMapper.getEntityMapper().mapToString(query.getObject()));
+
+				ElasticsearchPersistentEntity persistentEntity = getPersistentEntityFor(query.getObject().getClass());
+				if (persistentEntity.getJoinProperty() != null && persistentEntity.getJoinRoutingField() != null) {
+					Object joinField = persistentEntity.getPropertyAccessor(query.getObject()).getProperty(persistentEntity.getJoinProperty());
+					try {
+						java.lang.reflect.Field routingField = joinField.getClass().getField(persistentEntity.getJoinRoutingField());
+						String routing = (String)ReflectionUtils.getField(routingField, joinField);
+						if (routing != null) {
+							indexRequestBuilder.setRouting(routing);
+						}
+					} catch (NoSuchFieldException e) {
+					}
+				}
 			} else if (query.getSource() != null) {
 				indexRequestBuilder = client.prepareIndex(indexName, type, query.getId()).setSource(query.getSource());
 			} else {
@@ -1221,6 +1238,7 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 			if (query.getParentId() != null) {
 				indexRequestBuilder.setParent(query.getParentId());
 			}
+
 
 			return indexRequestBuilder;
 		} catch (IOException e) {

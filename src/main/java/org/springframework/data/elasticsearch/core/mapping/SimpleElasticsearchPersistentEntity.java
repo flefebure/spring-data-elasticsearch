@@ -68,6 +68,8 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 	private ElasticsearchPartitioner indexPartitioner;
 	Map<String, ElasticsearchPersistentProperty> innerHitsProperties;
 	private Class[] mappingsAtCreation;
+	private ElasticsearchPersistentProperty joinProperty;
+	private String joinRoutingField;
 
 	public SimpleElasticsearchPersistentEntity(TypeInformation<T> typeInformation) {
 		super(typeInformation);
@@ -187,13 +189,7 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 				this.parentIdProperty = property;
 				this.parentType = parent.type();
 			}
-		}
 
-		if (property.isVersionProperty()) {
-			Assert.isTrue(property.getType() == Long.class, "Version property should be Long");
-		}
-
-		if (property.getField() != null) {
 			InnerHits innerHits = property.getField().getAnnotation(InnerHits.class);
 			if (innerHits != null) {
 				if (innerHitsProperties == null)
@@ -201,7 +197,19 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 				Assert.isTrue(!innerHitsProperties.containsKey(innerHits.path()), "Only one filed can be mapped with the same innerHi path");
 				innerHitsProperties.put(innerHits.path(), property);
 			}
+
+			Join join = property.getField().getAnnotation(Join.class);
+			if (join != null) {
+				this.joinProperty = property;
+				this.joinRoutingField = join.routingField();
+			}
 		}
+
+		if (property.isVersionProperty()) {
+			Assert.isTrue(property.getType() == Long.class, "Version property should be Long");
+		}
+
+
 	}
 	public Partitioner[] getPartitioners() {
 		return partitioners;
@@ -234,5 +242,15 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 	@Override
 	public Class[] mappingsAtCreation() {
 		return mappingsAtCreation;
+	}
+
+	@Override
+	public String getJoinRoutingField() {
+		return joinRoutingField;
+	}
+
+	@Override
+	public ElasticsearchPersistentProperty getJoinProperty() {
+		return joinProperty;
 	}
 }
