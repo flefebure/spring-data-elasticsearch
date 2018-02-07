@@ -1222,7 +1222,8 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 						if (routing != null) {
 							indexRequestBuilder.setRouting(routing);
 						}
-					} catch (NoSuchFieldException e) {
+					} catch (Exception e) {
+						logger.warn(e.getMessage(),e);
 					}
 				}
 			} else if (query.getSource() != null) {
