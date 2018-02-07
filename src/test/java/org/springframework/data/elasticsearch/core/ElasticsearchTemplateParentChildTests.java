@@ -17,6 +17,7 @@ package org.springframework.data.elasticsearch.core;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.elasticsearch.index.query.QueryBuilders.*;
+import static org.elasticsearch.join.query.JoinQueryBuilders.*;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
@@ -183,7 +184,7 @@ public class ElasticsearchTemplateParentChildTests {
 		elasticsearchTemplate.refresh(ChildEntity.class);
 
 		// find all parents that have the first child
-		QueryBuilder query = hasChildQuery(ParentEntity.CHILD_TYPE, QueryBuilders.termQuery("name", child1name.toLowerCase()), ScoreMode.None).innerHit(new InnerHitBuilder(), true);
+		QueryBuilder query = hasChildQuery(ParentEntity.CHILD_TYPE, QueryBuilders.termQuery("name", child1name.toLowerCase()), ScoreMode.None).innerHit(new InnerHitBuilder());
 		List<ParentEntity> parents = elasticsearchTemplate.queryForList(new NativeSearchQuery(query), ParentEntity.class);
 
 		assertThat("children", parents, hasSize(1));
@@ -205,7 +206,7 @@ public class ElasticsearchTemplateParentChildTests {
 		elasticsearchTemplate.refresh(ChildEntity.class);
 
 		// find all parents that have the first child
-		QueryBuilder query = hasParentQuery(ParentEntity.PARENT_TYPE, QueryBuilders.termQuery("name", "firstparent"), false).innerHit(new InnerHitBuilder(), true);
+		QueryBuilder query = hasParentQuery(ParentEntity.PARENT_TYPE, QueryBuilders.termQuery("name", "firstparent"), false).innerHit(new InnerHitBuilder());
 		List<ChildEntity> children = elasticsearchTemplate.queryForList(new NativeSearchQuery(query), ChildEntity.class);
 
 		assertThat("children", children, hasSize(1));

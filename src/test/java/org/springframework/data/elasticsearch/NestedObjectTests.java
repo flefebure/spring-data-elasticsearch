@@ -407,7 +407,7 @@ public class NestedObjectTests {
 		index.setObject(person1);
 		elasticsearchTemplate.index(index);
 		elasticsearchTemplate.refresh(Person.class);
-		QueryBuilder query = nestedQuery("books", QueryBuilders.termQuery("books.name", "testbook1"), ScoreMode.Total).innerHit(new InnerHitBuilder(), true);
+		QueryBuilder query = nestedQuery("books", QueryBuilders.termQuery("books.name", "testbook1"), ScoreMode.Total).innerHit(new InnerHitBuilder());
 		List<Person> persons = elasticsearchTemplate.queryForList(new NativeSearchQuery(query), Person.class);
 
 
