@@ -18,6 +18,7 @@ package org.springframework.data.elasticsearch.core.query;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.search.aggregations.AbstractAggregationBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
@@ -46,6 +47,7 @@ public class NativeSearchQuery extends AbstractQuery implements SearchQuery {
 	private int from;
 	private int size;
 	private String preference;
+	private TimeValue timeOut;
 
 
 	public NativeSearchQuery(QueryBuilder query) {
@@ -166,5 +168,10 @@ public class NativeSearchQuery extends AbstractQuery implements SearchQuery {
 	public void setPreference(String preference) {
 		this.preference = preference;
 	}
+
+	@Override
+	public TimeValue getTimeOut() { return timeOut; }
+
+	public void setTimeOut(TimeValue timeOut) { this.timeOut = timeOut; }
 
 }
