@@ -21,9 +21,9 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.lucene.util.automaton.RegExp;
 import org.elasticsearch.search.aggregations.AbstractAggregationBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
-import org.elasticsearch.search.aggregations.bucket.terms.Terms;
+import org.elasticsearch.search.aggregations.BucketOrder;
+import org.elasticsearch.search.aggregations.bucket.terms.IncludeExclude;
 import org.elasticsearch.search.aggregations.bucket.terms.TermsAggregationBuilder;
-import org.elasticsearch.search.aggregations.bucket.terms.support.IncludeExclude;
 import org.springframework.data.elasticsearch.core.facet.AbstractFacetRequest;
 import org.springframework.util.Assert;
 
@@ -81,16 +81,16 @@ public class TermFacetRequest extends AbstractFacetRequest {
 
 		switch (order) {
 			case descTerm:
-				termsBuilder.order(Terms.Order.term(false));
+				termsBuilder.order(BucketOrder.key(false));
 				break;
 			case ascTerm:
-				termsBuilder.order(Terms.Order.term(true));
+				termsBuilder.order(BucketOrder.key(true));
 				break;
 			case descCount:
-				termsBuilder.order(Terms.Order.count(false));
+				termsBuilder.order(BucketOrder.count(false));
 				break;
 			default:
-				termsBuilder.order(Terms.Order.count(true));
+				termsBuilder.order(BucketOrder.count(true));
 		}
 		if (ArrayUtils.isNotEmpty(excludeTerms)) {
 			termsBuilder.includeExclude(new IncludeExclude(null,excludeTerms));

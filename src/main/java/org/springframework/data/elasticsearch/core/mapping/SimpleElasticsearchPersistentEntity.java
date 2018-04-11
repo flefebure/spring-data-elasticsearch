@@ -52,13 +52,13 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 
 	private String indexName;
 	private String indexType;
+	private ElasticsearchPersistentProperty fieldTypeV6;
+	private String indexTypeV6;
 	private boolean useServerConfiguration;
 	private short shards;
 	private short replicas;
 	private String refreshInterval;
 	private String indexStoreType;
-	private String parentType;
-	private ElasticsearchPersistentProperty parentIdProperty;
 	private String settingPath;
 	private boolean createIndexAndMapping;
 	private String[] partitionersFields;
@@ -67,9 +67,10 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 	private String partitionSeparator;
 	private ElasticsearchPartitioner indexPartitioner;
 	Map<String, ElasticsearchPersistentProperty> innerHitsProperties;
-	private Class[] mappingsAtCreation;
-	private ElasticsearchPersistentProperty joinProperty;
+	private ElasticsearchPersistentProperty join;
 	private String joinRoutingField;
+	private HashMap joinRelations;
+
 
 	public SimpleElasticsearchPersistentEntity(TypeInformation<T> typeInformation) {
 		super(typeInformation);
@@ -94,7 +95,8 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 			this.partitioners = typeInformation.getType().getAnnotation(Document.class).partitioners();
 			this.partitionersParameters = typeInformation.getType().getAnnotation(Document.class).partitionersParameters();
 			this.partitionSeparator = typeInformation.getType().getAnnotation(Document.class).partitionSeparator();
-			this.mappingsAtCreation = document.mappingsAtCreation();
+			this.indexTypeV6 = !document.typeV6().isEmpty()?document.typeV6():null;
+
 		}
 		if (clazz.isAnnotationPresent(Setting.class)) {
 			this.settingPath = typeInformation.getType().getAnnotation(Setting.class).settingPath();
@@ -156,16 +158,6 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 	}
 
 	@Override
-	public String getParentType() {
-		return parentType;
-	}
-
-	@Override
-	public ElasticsearchPersistentProperty getParentIdProperty() {
-		return parentIdProperty;
-	}
-
-	@Override
 	public String settingPath() {
 		Expression expression = parser.parseExpression(settingPath, ParserContext.TEMPLATE_EXPRESSION);
 		return expression.getValue(context, String.class);
@@ -181,14 +173,6 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 		super.addPersistentProperty(property);
 
 		if (property.getField() != null) {
-			Parent parent = property.getField().getAnnotation(Parent.class);
-			if (parent != null) {
-				Assert.isNull(this.parentIdProperty, "Only one field can hold a @Parent annotation");
-				Assert.isNull(this.parentType, "Only one field can hold a @Parent annotation");
-				Assert.isTrue(property.getType() == String.class, "Parent ID property should be text");
-				this.parentIdProperty = property;
-				this.parentType = parent.type();
-			}
 
 			InnerHits innerHits = property.getField().getAnnotation(InnerHits.class);
 			if (innerHits != null) {
@@ -200,8 +184,16 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 
 			Join join = property.getField().getAnnotation(Join.class);
 			if (join != null) {
-				this.joinProperty = property;
+				this.join = property;
 				this.joinRoutingField = join.routingField();
+				this.joinRelations = new HashMap();
+				for (int i = 0; i < join.joinChildren().length ; i++) {
+					joinRelations.put(join.joinParents()[i], join.joinChildren()[i]);
+				}
+			}
+			Type type = property.getField().getAnnotation(Type.class);
+			if (type != null) {
+				this.fieldTypeV6 = property;
 			}
 		}
 
@@ -240,17 +232,28 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 	}
 
 	@Override
-	public Class[] mappingsAtCreation() {
-		return mappingsAtCreation;
+	public ElasticsearchPersistentProperty getJoin() {
+		return join;
+	}
+
+	@Override
+	public Map getJoinRelations() {
+		return joinRelations;
+	}
+
+
+	@Override
+	public String getIndexTypeV6() {
+		return indexTypeV6;
+	}
+
+	@Override
+	public ElasticsearchPersistentProperty getFieldTypeV6() {
+		return fieldTypeV6;
 	}
 
 	@Override
 	public String getJoinRoutingField() {
 		return joinRoutingField;
-	}
-
-	@Override
-	public ElasticsearchPersistentProperty getJoinProperty() {
-		return joinProperty;
 	}
 }

@@ -27,7 +27,7 @@ import java.util.Date;
  *
  * @author Franck Lefebure
  */
-@Document(indexName = "index", type = "type",  shards = 1,
+@Document(indexName = "index_spel", type = "type",  shards = 1,
 		replicas = 0, refreshInterval = "-1", partitionersFields = {"customerId","creationDate","id"}, partitioners = {Partitioner.fixed_string, Partitioner.date_range, Partitioner.long_range}, partitionersParameters = {"","yyyy","#{@partitionSize}"}, partitionSeparator = "-")
 public class SpelPartitionedEntity {
 

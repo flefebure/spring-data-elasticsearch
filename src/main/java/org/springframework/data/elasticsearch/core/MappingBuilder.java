@@ -22,6 +22,7 @@ import static org.springframework.util.StringUtils.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -59,7 +60,8 @@ class MappingBuilder {
 	public static final String FIELD_SEARCH_ANALYZER = "search_analyzer";
 	public static final String FIELD_INDEX_ANALYZER = "analyzer";
 	public static final String FIELD_PROPERTIES = "properties";
-	public static final String FIELD_PARENT = "_parent";
+	public static final String TYPE_JOIN = "join";
+	public static final String JOIN_RELATIONS = "relations";
 
 	public static final String COMPLETION_PRESERVE_SEPARATORS = "preserve_separators";
 	public static final String COMPLETION_PRESERVE_POSITION_INCREMENTS = "preserve_position_increments";
@@ -74,24 +76,26 @@ class MappingBuilder {
 
 	private static SimpleTypeHolder SIMPLE_TYPE_HOLDER = new SimpleTypeHolder();
 
-	static XContentBuilder buildMapping(Class clazz, String indexType, String idFieldName, String parentType) throws IOException {
+	static XContentBuilder buildMapping(Class clazz, String indexType, String idFieldName, String joinName) throws IOException {
+		Map<String, String> relations = new HashMap<>();
+		relations.put("parent", "child");
+		return buildMapping(clazz, indexType, idFieldName, joinName, relations);
+	}
+
+	static XContentBuilder buildMapping(Class clazz, String indexType, String idFieldName, String joinName, Map<String,String> joinRelations) throws IOException {
 
 		XContentBuilder mapping = jsonBuilder().startObject().startObject(indexType);
-		// Parent
-		if (hasText(parentType)) {
-			mapping.startObject(FIELD_PARENT).field(FIELD_TYPE, parentType).endObject();
-		}
+
 
 		// Properties
 		XContentBuilder xContentBuilder = mapping.startObject(FIELD_PROPERTIES);
 
-		mapEntity(xContentBuilder, clazz, true, idFieldName, EMPTY, false, FieldType.Auto, null);
-
+		mapEntity(xContentBuilder, clazz, true, idFieldName, EMPTY, false, FieldType.Auto, null, joinName, joinRelations);
 		return xContentBuilder.endObject().endObject().endObject();
 	}
 
 	private static void mapEntity(XContentBuilder xContentBuilder, Class clazz, boolean isRootObject, String idFieldName,
-								  String nestedObjectFieldName, boolean nestedOrObjectField, FieldType fieldType, Field fieldAnnotation) throws IOException {
+								  String nestedObjectFieldName, boolean nestedOrObjectField, FieldType fieldType, Field fieldAnnotation, String joinName, Map<String,String> joinRelations) throws IOException {
 
 		java.lang.reflect.Field[] fields = retrieveFields(clazz);
 
@@ -127,14 +131,18 @@ class MappingBuilder {
 
 			boolean isGeoPointField = isGeoPointField(field);
 			boolean isCompletionField = isCompletionField(field);
+			boolean isJoinField = isJoinField(field);
 
 			Field singleField = field.getAnnotation(Field.class);
-			if (!isGeoPointField && !isCompletionField && isEntity(field) && isAnnotated(field)) {
+			if (isJoinField) {
+				xContentBuilder.startObject(joinName).field(FIELD_TYPE, TYPE_JOIN).field(JOIN_RELATIONS, joinRelations).endObject();
+			}
+			else if (!isGeoPointField && !isCompletionField && isEntity(field) && isAnnotated(field)) {
 				if (singleField == null) {
 					continue;
 				}
 				boolean nestedOrObject = isNestedOrObjectField(field);
-				mapEntity(xContentBuilder, getFieldType(field), false, EMPTY, field.getName(), nestedOrObject, singleField.type(), field.getAnnotation(Field.class));
+				mapEntity(xContentBuilder, getFieldType(field), false, EMPTY, field.getName(), nestedOrObject, singleField.type(), field.getAnnotation(Field.class), null, null);
 				if (nestedOrObject) {
 					continue;
 				}
@@ -155,7 +163,7 @@ class MappingBuilder {
 				applyDefaultIdFieldMapping(xContentBuilder, field);
 			} else if (multiField != null) {
 				addMultiFieldMapping(xContentBuilder, field, multiField, isNestedOrObjectField(field));
-			} else if (singleField != null) {
+			} else if (singleField != null && !isJoinField) {
 				addSingleFieldMapping(xContentBuilder, field, singleField, isNestedOrObjectField(field));
 			}
 		}
@@ -367,6 +375,10 @@ class MappingBuilder {
 
 	private static boolean isGeoPointField(java.lang.reflect.Field field) {
 		return field.getType() == GeoPoint.class || field.getAnnotation(GeoPointField.class) != null;
+	}
+
+	private static boolean isJoinField(java.lang.reflect.Field field) {
+		return field.getAnnotation(Join.class) != null;
 	}
 
 	private static boolean isCompletionField(java.lang.reflect.Field field) {

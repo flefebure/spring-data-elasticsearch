@@ -27,7 +27,7 @@ import java.util.Date;
  *
  * @author FRanck Lefebure
  */
-@Document(indexName = "index", type = "dateparttype", shards = 1,
+@Document(indexName = "index_date", type = "dateparttype", shards = 1,
 		replicas = 0, refreshInterval = "-1", partitionersFields = "creationDate", partitioners = Partitioner.date_range, partitionersParameters = "yyyyMM")
 public class DatePartitionedEntity {
 

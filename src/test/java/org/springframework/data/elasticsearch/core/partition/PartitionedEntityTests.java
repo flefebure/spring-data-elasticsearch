@@ -20,6 +20,8 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -42,6 +44,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.List;
 
+
 /**
  * SpELEntityTest
  *
@@ -53,6 +56,8 @@ import java.util.List;
 public class PartitionedEntityTests {
 
 	SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+
+	Logger logger = LoggerFactory.getLogger(getClass());
 
 	@Autowired
 	private LongPartitionedEntityRepository longPartitionedEntityRepository;
@@ -93,7 +98,7 @@ public class PartitionedEntityTests {
 		e.setId("2023");
 		longPartitionedEntityRepository.save(e);
 		Assert.assertEquals("2000_2023", e.getId());
-		Assert.assertTrue(template.indexExists("index_2000"));
+		Assert.assertTrue(template.indexExists("index_long_2000"));
 
 		e.setLabel("test");
 		longPartitionedEntityRepository.save(e);
@@ -115,7 +120,7 @@ public class PartitionedEntityTests {
 		e.setCreationDate(sdf.parse("02/03/2015"));
 		datePartitionedEntityRepository.save(e);
 		Assert.assertEquals("201503_2023", e.getId());
-		Assert.assertTrue(template.indexExists("index_201503"));
+		Assert.assertTrue(template.indexExists("index_date_201503"));
 
 		e.setLabel("test");
 		datePartitionedEntityRepository.save(e);
@@ -132,7 +137,7 @@ public class PartitionedEntityTests {
 		e.setCustomerId("johndoe");
 		stringPartitionedEntityRepository.save(e);
 		Assert.assertEquals("johndoe_2023", e.getId());
-		Assert.assertTrue(template.indexExists("index_johndoe"));
+		Assert.assertTrue(template.indexExists("index_string_johndoe"));
 
 		e.setLabel("test");
 		stringPartitionedEntityRepository.save(e);
@@ -228,7 +233,7 @@ public class PartitionedEntityTests {
 		e.setCreationDate(sdf.parse("15/06/2015"));
 		compositePartitionedEntityRepository.save(e);
 		Assert.assertEquals("johndoe_201506_2023", e.getId());
-		Assert.assertTrue(template.indexExists("index_johndoe_201506"));
+		Assert.assertTrue(template.indexExists("index_composite_johndoe_201506"));
 
 		e.setLabel("test");
 		compositePartitionedEntityRepository.save(e);
@@ -251,13 +256,14 @@ public class PartitionedEntityTests {
 
 	@Test
 	public void testSpelEntitie() throws ParseException  {
+		logger.info("test");
 		SpelPartitionedEntity e = new SpelPartitionedEntity();
 		e.setId("2023005");
 		e.setCustomerId("johndoe");
 		e.setCreationDate(sdf.parse("15/06/2015"));
 		spelPartitionedEntityRepository.save(e);
 		Assert.assertEquals("johndoe-2015-2000000-2023005", e.getId());
-		Assert.assertTrue(template.indexExists("index-johndoe-2015-2000000"));
+		Assert.assertTrue(template.indexExists("index_spel-johndoe-2015-2000000"));
 
 		e.setLabel("test");
 		spelPartitionedEntityRepository.save(e);
@@ -265,7 +271,7 @@ public class PartitionedEntityTests {
 		e = spelPartitionedEntityRepository.findOne("johndoe-2015-2000000-2023005");
 		Assert.assertNotNull(e);
 		Assert.assertEquals("test", e.getLabel());
-/*
+
 		List<SpelPartitionedEntity> l = spelPartitionedEntityRepository.findByLabel("test");
 		Assert.assertEquals(1, l.size());
 
@@ -277,7 +283,8 @@ public class PartitionedEntityTests {
 
 		List<SpelPartitionedEntity> l2 = spelPartitionedEntityRepository.findByLabel("test", partitions);
 		Assert.assertEquals(1, l2.size());
-*/
+
+		/*
 		Partition[] partitions2 = new Partition[]{
 				new StringPartition("customerId", new String[]{"johndoe"}),
 				new DatePartition("creationDate", sdf.parse("01/02/2014"), sdf.parse("01/07/2014")),
@@ -286,5 +293,6 @@ public class PartitionedEntityTests {
 
 		List<SpelPartitionedEntity> l3 = spelPartitionedEntityRepository.findByLabel("test", partitions2);
 		Assert.assertEquals(0, l3.size());
+		*/
 	}
 }

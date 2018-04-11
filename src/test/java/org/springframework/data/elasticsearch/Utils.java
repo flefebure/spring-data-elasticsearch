@@ -17,7 +17,7 @@ package org.springframework.data.elasticsearch;
 
 import org.elasticsearch.client.Client;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.transport.InetSocketTransportAddress;
+import org.elasticsearch.common.transport.TransportAddress;
 import org.elasticsearch.transport.client.PreBuiltTransportClient;
 
 import java.net.InetAddress;
@@ -32,7 +32,7 @@ public class Utils {
     public static Client getNodeClient() {
         try {
             return new PreBuiltTransportClient(Settings.builder()
-                    .build()).addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName("localhost"), Integer.valueOf(port)));
+                    .build()).addTransportAddress(new TransportAddress(InetAddress.getByName("localhost"), Integer.valueOf(port)));
         } catch (UnknownHostException e) {
             throw new RuntimeException("Unable to connect to localhost cluster ar port " + port);
         }

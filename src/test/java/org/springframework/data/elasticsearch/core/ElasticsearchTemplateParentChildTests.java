@@ -38,6 +38,7 @@ import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.elasticsearch.core.query.IndexQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
+import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
 import org.springframework.data.elasticsearch.core.query.UpdateQuery;
 import org.springframework.data.elasticsearch.entities.ParentEntity;
 import org.springframework.data.elasticsearch.entities.ParentEntity.ChildEntity;
@@ -60,6 +61,7 @@ public class ElasticsearchTemplateParentChildTests {
 		elasticsearchTemplate.createIndex(ParentEntity.class);
 		elasticsearchTemplate.createIndex(ChildEntity.class);
 		elasticsearchTemplate.putMapping(ChildEntity.class);
+		elasticsearchTemplate.putMapping(ParentEntity.class);
 	}
 
 	@After
@@ -91,14 +93,29 @@ public class ElasticsearchTemplateParentChildTests {
 	}
 
 	@Test
+	public void shouldFetchOnlyParents() {
+		shouldIndexParentChildEntity();
+		QueryBuilder queryBuilder = QueryBuilders.matchAllQuery();
+		NativeSearchQuery nativeSearchQuery = new NativeSearchQueryBuilder().withQuery(queryBuilder).build();
+
+		List<ParentEntity> parents = elasticsearchTemplate.queryForList(nativeSearchQuery, ParentEntity.class);
+
+		assertThat("parents", parents, hasSize(2));
+	}
+
+
+	@Test
 	public void shouldUpdateChild() throws Exception {
 		// index parent and child
 		ParentEntity parent = index("parent", "Parent");
 		ChildEntity child = index("child", parent.getId(), "Child");
+
+		elasticsearchTemplate.refresh(ParentEntity.class);
+
 		String newChildName = "New Child Name";
 
 		// update the child, not forgetting to set the parent id as routing parameter
-		UpdateRequest updateRequest = new UpdateRequest(ParentEntity.INDEX, ParentEntity.CHILD_TYPE, child.getId());
+		UpdateRequest updateRequest = new UpdateRequest(ParentEntity.INDEX, ParentEntity.INDEX, child.getId());
 		updateRequest.routing(parent.getId());
 		XContentBuilder builder;
 			builder = jsonBuilder().startObject().field("name", newChildName).endObject();
@@ -108,22 +125,25 @@ public class ElasticsearchTemplateParentChildTests {
 		assertThat(response.getShardInfo().getSuccessful(), is(1));
 	}
 
-	@Test(expected = RoutingMissingException.class)
+	//@Test(expected = RoutingMissingException.class)
 	public void shouldFailWithRoutingMissingExceptionOnUpdateChildIfNotRoutingSetOnUpdateRequest() throws Exception {
 		// index parent and child
 		ParentEntity parent = index("parent", "Parent");
 		ChildEntity child = index("child", parent.getId(), "Child");
+
+		elasticsearchTemplate.refresh(ParentEntity.class);
+
 		String newChildName = "New Child Name";
 
 		// update the child, forget routing parameter
-		UpdateRequest updateRequest = new UpdateRequest(ParentEntity.INDEX, ParentEntity.CHILD_TYPE, child.getId());
+		UpdateRequest updateRequest = new UpdateRequest(ParentEntity.INDEX, ParentEntity.INDEX, child.getId());
 		XContentBuilder builder;
 		builder = jsonBuilder().startObject().field("name", newChildName).endObject();
 		updateRequest.doc(builder);
 		update(updateRequest);
 	}
 
-	@Test(expected = RoutingMissingException.class)
+	//@Test(expected = RoutingMissingException.class)
 	public void shouldFailWithRoutingMissingExceptionOnUpdateChildIfRoutingOnlySetOnRequestDoc() throws Exception {
 		// index parent and child
 		ParentEntity parent = index("parent", "Parent");
@@ -131,7 +151,7 @@ public class ElasticsearchTemplateParentChildTests {
 		String newChildName = "New Child Name";
 
 		// update the child
-		UpdateRequest updateRequest = new UpdateRequest(ParentEntity.INDEX, ParentEntity.CHILD_TYPE, child.getId());
+		UpdateRequest updateRequest = new UpdateRequest(ParentEntity.INDEX, ParentEntity.INDEX, child.getId());
 		XContentBuilder builder;
 		builder = jsonBuilder().startObject().field("name", newChildName).endObject();
 		updateRequest.doc(builder);
@@ -154,7 +174,7 @@ public class ElasticsearchTemplateParentChildTests {
 		IndexQuery index = new IndexQuery();
 		index.setId(child.getId());
 		index.setObject(child);
-		index.setParentId(child.getParentId());
+		//index.setParentId(child.getParentId());
 		elasticsearchTemplate.index(index);
 
 		return child;
@@ -187,7 +207,8 @@ public class ElasticsearchTemplateParentChildTests {
 		QueryBuilder query = hasChildQuery(ParentEntity.CHILD_TYPE, QueryBuilders.termQuery("name", child1name.toLowerCase()), ScoreMode.None).innerHit(new InnerHitBuilder());
 		List<ParentEntity> parents = elasticsearchTemplate.queryForList(new NativeSearchQuery(query), ParentEntity.class);
 
-		assertThat("children", parents, hasSize(1));
+		assertThat("parents", parents, hasSize(1));
+		assertThat("children", parents.get(0).getChildren(), hasSize(1));
 
 	}
 
@@ -210,6 +231,7 @@ public class ElasticsearchTemplateParentChildTests {
 		List<ChildEntity> children = elasticsearchTemplate.queryForList(new NativeSearchQuery(query), ChildEntity.class);
 
 		assertThat("children", children, hasSize(1));
+		assertThat("parent", children.get(0).getParent(), notNullValue());
 
 	}
 }

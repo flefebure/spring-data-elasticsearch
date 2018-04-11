@@ -15,40 +15,38 @@
  */
 package org.springframework.data.elasticsearch.core;
 
-import static org.hamcrest.Matchers.*;
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
-
+import com.fasterxml.jackson.databind.util.ArrayIterator;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
-import lombok.Value;
-
-import java.util.*;
-
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.databind.util.ArrayIterator;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.common.document.DocumentField;
 import org.elasticsearch.search.SearchHit;
-import org.elasticsearch.search.SearchHitField;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.aggregations.Aggregations;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.springframework.data.annotation.AccessType;
-import org.springframework.data.annotation.Id;
 import org.springframework.data.domain.Page;
 import org.springframework.data.elasticsearch.annotations.Document;
-import org.springframework.data.elasticsearch.core.DefaultResultMapperTests.ImmutableEntity;
 import org.springframework.data.elasticsearch.core.aggregation.AggregatedPage;
 import org.springframework.data.elasticsearch.core.mapping.SimpleElasticsearchMappingContext;
 import org.springframework.data.elasticsearch.entities.Car;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.Assert.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * @author Artur Konczak
@@ -73,7 +71,7 @@ public class DefaultResultMapperTests {
 		//Given
 		SearchHit[] hits = {createCarHit("Ford", "Grat"), createCarHit("BMW", "Arrow")};
 		SearchHits searchHits = mock(SearchHits.class);
-		when(searchHits.totalHits()).thenReturn(2L);
+		when(searchHits.getTotalHits()).thenReturn(2L);
 		when(searchHits.iterator()).thenReturn(new ArrayIterator(hits));
 		when(response.getHits()).thenReturn(searchHits);
 
@@ -99,7 +97,7 @@ public class DefaultResultMapperTests {
 		//Given
 		SearchHit[] hits = {createCarHit("Ford", "Grat"), createCarHit("BMW", "Arrow")};
 		SearchHits searchHits = mock(SearchHits.class);
-		when(searchHits.totalHits()).thenReturn(2L);
+		when(searchHits.getTotalHits()).thenReturn(2L);
 		when(searchHits.iterator()).thenReturn(new ArrayIterator(hits));
 		when(response.getHits()).thenReturn(searchHits);
 
@@ -117,7 +115,7 @@ public class DefaultResultMapperTests {
 		//Given
 		SearchHit[] hits = {createCarPartialHit("Ford", "Grat"), createCarPartialHit("BMW", "Arrow")};
 		SearchHits searchHits = mock(SearchHits.class);
-		when(searchHits.totalHits()).thenReturn(2L);
+		when(searchHits.getTotalHits()).thenReturn(2L);
 		when(searchHits.iterator()).thenReturn(new ArrayIterator(hits));
 		when(response.getHits()).thenReturn(searchHits);
 
@@ -169,13 +167,13 @@ public class DefaultResultMapperTests {
 
 	private SearchHit createCarHit(String name, String model) {
 		SearchHit hit = mock(SearchHit.class);
-		when(hit.sourceAsString()).thenReturn(createJsonCar(name, model));
+		when(hit.getSourceAsString()).thenReturn(createJsonCar(name, model));
 		return hit;
 	}
 
 	private SearchHit createCarPartialHit(String name, String model) {
 		SearchHit hit = mock(SearchHit.class);
-		when(hit.sourceAsString()).thenReturn(null);
+		when(hit.getSourceAsString()).thenReturn(null);
 		when(hit.getFields()).thenReturn(createCarFields(name, model));
 		return hit;
 	}
@@ -188,10 +186,10 @@ public class DefaultResultMapperTests {
 		return sb.toString();
 	}
 
-	private Map<String, SearchHitField> createCarFields(String name, String model) {
-		Map<String, SearchHitField> result = new HashMap<String, SearchHitField>();
-		result.put("name", new SearchHitField("name", Arrays.<Object>asList(name)));
-		result.put("model", new SearchHitField("model", Arrays.<Object>asList(model)));
+	private Map<String, DocumentField> createCarFields(String name, String model) {
+		Map<String, DocumentField> result = new HashMap<String, DocumentField>();
+		result.put("name", new DocumentField("name", Arrays.<Object>asList(name)));
+		result.put("model", new DocumentField("model", Arrays.<Object>asList(model)));
 		return result;
 	}
 	

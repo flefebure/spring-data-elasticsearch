@@ -16,15 +16,6 @@
 package org.springframework.data.elasticsearch.core;
 
 
-import java.beans.IntrospectionException;
-import java.beans.PropertyDescriptor;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.nio.charset.Charset;
-import java.util.*;
-
 import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -33,8 +24,8 @@ import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.get.MultiGetItemResponse;
 import org.elasticsearch.action.get.MultiGetResponse;
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.common.document.DocumentField;
 import org.elasticsearch.search.SearchHit;
-import org.elasticsearch.search.SearchHitField;
 import org.elasticsearch.search.SearchHits;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.elasticsearch.ElasticsearchException;
@@ -46,6 +37,21 @@ import org.springframework.data.elasticsearch.core.mapping.ElasticsearchPersiste
 import org.springframework.data.elasticsearch.core.mapping.ElasticsearchPersistentProperty;
 import org.springframework.data.mapping.PersistentProperty;
 import org.springframework.data.mapping.context.MappingContext;
+
+import java.beans.IntrospectionException;
+import java.beans.PropertyDescriptor;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * @author Artur Konczak
@@ -79,13 +85,13 @@ public class DefaultResultMapper extends AbstractResultMapper {
 
 	@Override
 	public <T> AggregatedPage<T> mapResults(SearchResponse response, Class<T> clazz, Pageable pageable) {
-		long totalHits = response.getHits().totalHits();
+		long totalHits = response.getHits().getTotalHits();
 		List<T> results = new ArrayList<T>();
 		for (SearchHit hit : response.getHits()) {
 			if (hit != null) {
 				T result = null;
-				if (StringUtils.isNotBlank(hit.sourceAsString())) {
-					result = mapEntity(hit.sourceAsString(), clazz);
+				if (StringUtils.isNotBlank(hit.getSourceAsString())) {
+					result = mapEntity(hit.getSourceAsString(), clazz);
 				} else {
 					result = mapEntity(hit.getFields().values(), clazz);
 				}
@@ -105,7 +111,7 @@ public class DefaultResultMapper extends AbstractResultMapper {
 				ScriptedField scriptedField = field.getAnnotation(ScriptedField.class);
 				if (scriptedField != null) {
 					String name = scriptedField.name().isEmpty() ? field.getName() : scriptedField.name();
-					SearchHitField searchHitField = hit.getFields().get(name);
+					DocumentField searchHitField = hit.getFields().get(name);
 					if (searchHitField != null) {
 						field.setAccessible(true);
 						try {
@@ -123,17 +129,17 @@ public class DefaultResultMapper extends AbstractResultMapper {
 	}
 
 
-	private <T> T mapEntity(Collection<SearchHitField> values, Class<T> clazz) {
+	private <T> T mapEntity(Collection<DocumentField> values, Class<T> clazz) {
 		return mapEntity(buildJSONFromFields(values), clazz);
 	}
 
-	private String buildJSONFromFields(Collection<SearchHitField> values) {
+	private String buildJSONFromFields(Collection<DocumentField> values) {
 		JsonFactory nodeFactory = new JsonFactory();
 		try {
 			ByteArrayOutputStream stream = new ByteArrayOutputStream();
 			JsonGenerator generator = nodeFactory.createGenerator(stream, JsonEncoding.UTF8);
 			generator.writeStartObject();
-			for (SearchHitField value : values) {
+			for (DocumentField value : values) {
 				if (value.getValues().size() > 1) {
 					generator.writeArrayFieldStart(value.getName());
 					for (Object val : value.getValues()) {

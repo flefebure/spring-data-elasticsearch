@@ -25,7 +25,7 @@ import org.springframework.data.elasticsearch.annotations.Partitioner;
  *
  * @author Franck Lefebure
  */
-@Document(indexName = "index", type = "stringparttype", shards = 1,
+@Document(indexName = "index_string", type = "stringparttype", shards = 1,
 		replicas = 0, refreshInterval = "-1", partitionersFields = "customerId", partitioners = Partitioner.fixed_string, partitionersParameters = "")
 public class StringPartitionedEntity {
 

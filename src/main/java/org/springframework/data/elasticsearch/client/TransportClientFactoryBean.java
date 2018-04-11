@@ -15,14 +15,9 @@
  */
 package org.springframework.data.elasticsearch.client;
 
-import static org.apache.commons.lang.StringUtils.*;
-
-import java.net.InetAddress;
-import java.util.Properties;
-
 import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.transport.InetSocketTransportAddress;
+import org.elasticsearch.common.transport.TransportAddress;
 import org.elasticsearch.transport.client.PreBuiltTransportClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +25,11 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.util.Assert;
+
+import java.net.InetAddress;
+import java.util.Properties;
+
+import static org.apache.commons.lang.StringUtils.*;
 
 /**
  * TransportClientFactoryBean
@@ -96,14 +96,18 @@ public class TransportClientFactoryBean implements FactoryBean<TransportClient>,
 			Assert.hasText(hostName, "[Assertion failed] missing host name in 'clusterNodes'");
 			Assert.hasText(port, "[Assertion failed] missing port in 'clusterNodes'");
 			logger.info("adding transport node : " + clusterNode);
-			client.addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(hostName), Integer.valueOf(port)));
+			client.addTransportAddress(new TransportAddress(InetAddress.getByName(hostName), Integer.valueOf(port)));
 		}
 		client.connectedNodes();
 	}
 
 	private Settings settings() {
 		if (properties != null) {
-			return Settings.builder().put(properties).build();
+			Settings.Builder builder = Settings.builder();
+			for (Object key : properties.keySet()) {
+				builder.put((String)key, properties.getProperty((String)key));
+			}
+			return builder.build();
 		}
 		return Settings.builder()
 				.put("cluster.name", clusterName)

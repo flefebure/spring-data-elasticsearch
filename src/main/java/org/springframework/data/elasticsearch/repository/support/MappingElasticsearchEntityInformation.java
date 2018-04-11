@@ -89,7 +89,7 @@ public class MappingElasticsearchEntityInformation<T, ID extends Serializable> e
 
 	@Override
 	public String getParentId(T entity) {
-		ElasticsearchPersistentProperty parentProperty = entityMetadata.getParentIdProperty();
+		ElasticsearchPersistentProperty parentProperty = entityMetadata.getJoin();
 		try {
 			if (parentProperty != null) {
 				return (String) entityMetadata.getPropertyAccessor(entity).getProperty(parentProperty);

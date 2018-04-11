@@ -25,7 +25,7 @@ import org.springframework.data.elasticsearch.annotations.Partitioner;
  *
  * @author Franck Lefebure
  */
-@Document(indexName = "index", type = "longparttype",  shards = 1,
+@Document(indexName = "index_long", type = "longparttype",  shards = 1,
 		replicas = 0, refreshInterval = "-1", partitionersFields = "id", partitioners = Partitioner.long_range, partitionersParameters = "1000")
 public class LongPartitionedEntity {
 

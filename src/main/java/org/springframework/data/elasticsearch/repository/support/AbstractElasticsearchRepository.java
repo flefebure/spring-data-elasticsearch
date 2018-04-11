@@ -77,7 +77,7 @@ public abstract class AbstractElasticsearchRepository<T, ID extends Serializable
 				putMapping();
 			}
 		} catch (ElasticsearchException exception) {
-			LOGGER.error("failed to load elasticsearch nodes : " + exception.getDetailedMessage());
+			LOGGER.error("failed to load elasticsearch nodes : " + exception.getDetailedMessage(), exception);
 		}
 	}
 
@@ -251,7 +251,7 @@ public abstract class AbstractElasticsearchRepository<T, ID extends Serializable
 		Assert.notNull(entity, "Cannot delete 'null' entity.");
 		String parentId = extractParentIdFromBean(entity);
 		delete(extractIdFromBean(entity), parentId);
-		elasticsearchOperations.refresh(entityInformation.getIndexName());
+		//elasticsearchOperations.refresh(entityInformation.getIndexName());
 	}
 
 	@Override

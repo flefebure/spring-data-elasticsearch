@@ -23,7 +23,7 @@
 
         <commonscollections>3.2.1</commonscollections>
         <commonslang>2.6</commonslang>
-        <elasticsearch>5.6.7</elasticsearch>
+        <elasticsearch>6.2.3</elasticsearch>
         <springdata.commons>1.14.0.BUILD-SNAPSHOT</springdata.commons>
 
     </properties>
@@ -73,6 +73,10 @@
             <groupId>org.elasticsearch</groupId>
             <artifactId>elasticsearch</artifactId>
             <version>${elasticsearch}</version>
+            <exclusions>
+                <exclusion><groupId>org.apache.logging.log4j</groupId><artifactId>log4j-api</artifactId></exclusion>
+                <exclusion><groupId>org.apache.logging</groupId><artifactId>log4j-core</artifactId></exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -150,10 +154,25 @@
         </dependency>
 
         <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>2.18.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-inline</artifactId>
+            <version>2.18.0</version>
+            <scope>test</scope>
+        </dependency>
+
+
+
+        <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <version>${lombok}</version>
-            <scope>test</scope>
+            <!--scope>test</scope-->
         </dependency>
 
     </dependencies>
@@ -171,6 +190,14 @@
             <plugin>
                 <groupId>org.asciidoctor</groupId>
                 <artifactId>asciidoctor-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                </configuration>
             </plugin>
         </plugins>
     </build>

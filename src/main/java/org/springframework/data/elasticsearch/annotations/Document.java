@@ -37,6 +37,8 @@ public @interface Document {
 
 	String type() default "";
 
+	String typeV6() default "";
+
 	boolean useServerConfiguration() default false;
 
 	short shards() default 5;
@@ -57,5 +59,5 @@ public @interface Document {
 
 	String partitionSeparator() default "_";
 
-	Class[] mappingsAtCreation() default {};
+
 }

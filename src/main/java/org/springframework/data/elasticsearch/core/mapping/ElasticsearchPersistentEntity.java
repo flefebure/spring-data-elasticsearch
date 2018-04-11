@@ -45,13 +45,7 @@ public interface ElasticsearchPersistentEntity<T> extends PersistentEntity<T, El
 
 	ElasticsearchPersistentProperty getVersionProperty();
 
-	String getParentType();
-
-	ElasticsearchPersistentProperty getParentIdProperty();
-
 	String settingPath();
-
-	Class[] mappingsAtCreation();
 
 	boolean isCreateIndexAndMapping();
 
@@ -67,7 +61,14 @@ public interface ElasticsearchPersistentEntity<T> extends PersistentEntity<T, El
 
 	String getIndexName(T entity);
 
-	ElasticsearchPersistentProperty getJoinProperty();
+	ElasticsearchPersistentProperty getJoin();
+
+	Map getJoinRelations();
 
 	String getJoinRoutingField();
+
+	ElasticsearchPersistentProperty getFieldTypeV6();
+
+	String getIndexTypeV6();
+
 }

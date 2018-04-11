@@ -28,28 +28,76 @@ import java.util.List;
  * @author Philipp Jardas
  * @author Mohsin Husen
  */
-@Document(indexName = ParentEntity.INDEX, type = ParentEntity.PARENT_TYPE, shards = 1, replicas = 0, refreshInterval = "-1")
+
+
+@Document(indexName = ParentEntity.INDEX, type = ParentEntity.INDEX, typeV6 = ParentEntity.PARENT_TYPE, shards = 1, replicas = 0, refreshInterval = "-1")
 public class ParentEntity {
 
+   	public static class MyJoin{
+   		private String name;
+   		private String parent;
+
+		public MyJoin() {
+		}
+
+		public MyJoin(String name, String parent) {
+			this.name = name;
+			this.parent = parent;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+
+		public String getParent() {
+			return parent;
+		}
+
+		public void setParent(String parent) {
+			this.parent = parent;
+		}
+	}
+
 	public static final String INDEX = "parent-child";
-	public static final String PARENT_TYPE = "parent-entity";
-	public static final String CHILD_TYPE = "child-entity";
+	public static final String PARENT_TYPE = "parent";
+	public static final String CHILD_TYPE = "child";
 
 	@Id
 	private String id;
 	@Field(type = FieldType.text, store = true)
 	private String name;
+	@Field(type = FieldType.text, store = true)
+	@Type
+	private String type="parent";
+
+	public String getType() {
+		return type;
+	}
+
+	@Join(joinParents = "parent", joinChildren = "child", routingField = "parent")
+	private MyJoin join;
+
+	public MyJoin getJoin() {
+		return join;
+	}
 
 	public ParentEntity() {
+		this.join = new MyJoin("parent", null);
 	}
 
 	public ParentEntity(String id, String name) {
+		this();
 		this.id = id;
 		this.name = name;
 	}
 
+
 	@JsonIgnore
-	@InnerHits(path = "child-entity")
+	@InnerHits(path = "child")
 	private List<ChildEntity> children;
 
 	@JsonIgnore
@@ -62,7 +110,6 @@ public class ParentEntity {
 		this.children = children;
 	}
 
-
 	public String getId() {
 		return id;
 	}
@@ -71,33 +118,45 @@ public class ParentEntity {
 		return name;
 	}
 
+
+
 	@Override
 	public String toString() {
 		return new ToStringCreator(this).append("id", id).append("name", name).toString();
 	}
 
-	@Document(indexName = INDEX, type = CHILD_TYPE, shards = 1, replicas = 0, refreshInterval = "-1")
+	@Document(indexName = INDEX, type = ParentEntity.INDEX, typeV6 = ParentEntity.PARENT_TYPE, shards = 1, replicas = 0, refreshInterval = "-1")
 	public static class ChildEntity {
 
 		@Id
 		private String id;
 		@Field(type = FieldType.text, store = true)
-		@Parent(type = PARENT_TYPE)
-		private String parentId;
+		@Join(joinParents = "parent", joinChildren = "child", routingField = "parent")
+		private MyJoin join;
+		public MyJoin getJoin() {
+			return join;
+		}
 		@Field(type = FieldType.text, store = true)
 		private String name;
+		@Field(type = FieldType.text, store = true)
+		@Type
+		private String type="child";
+
+		public String getType() {
+			return type;
+		}
 
 		public ChildEntity() {
 		}
 
 		public ChildEntity(String id, String parentId, String name) {
 			this.id = id;
-			this.parentId = parentId;
+			this.join = new MyJoin("child", parentId);
 			this.name = name;
 		}
 
 		@JsonIgnore
-		@InnerHits(path = "parent-entity")
+		@InnerHits(path = "parent")
 		private Object parent;
 		@JsonIgnore
 		public ParentEntity getParent() {
@@ -112,9 +171,6 @@ public class ParentEntity {
 			return id;
 		}
 
-		public String getParentId() {
-			return parentId;
-		}
 
 		public String getName() {
 			return name;
@@ -122,7 +178,7 @@ public class ParentEntity {
 
 		@Override
 		public String toString() {
-			return new ToStringCreator(this).append("id", id).append("parentId", parentId).append("name", name).toString();
+			return new ToStringCreator(this).append("id", id).append("parentId", join.getParent()).append("name", name).toString();
 		}
 	}
 }

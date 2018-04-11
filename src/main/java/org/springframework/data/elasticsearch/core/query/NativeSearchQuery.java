@@ -74,6 +74,10 @@ public class NativeSearchQuery extends AbstractQuery implements SearchQuery {
 		return query;
 	}
 
+	public void setQuery(QueryBuilder query) {
+		this.query = query;
+	}
+
 	public QueryBuilder getFilter() {
 		return filter;
 	}
