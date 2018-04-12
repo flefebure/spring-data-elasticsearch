@@ -1,9 +1,10 @@
-package com.fasterxml.jackson.databind.ser.std;
+package org.springframework.data.elasticsearch.core;
 
 import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.ser.impl.ObjectIdWriter;
+import com.fasterxml.jackson.databind.ser.std.BeanSerializerBase;
 
 import java.io.IOException;
 import java.util.Set;
@@ -41,14 +42,25 @@ public class ExtraFieldSerializer extends BeanSerializerBase {
         super(source, objectIdWriter);
     }
 
+    public ExtraFieldSerializer(BeanSerializerBase source,
+                                  ObjectIdWriter objectIdWriter) {
+        super(source, objectIdWriter);
+    }
+
+    public ExtraFieldSerializer(BeanSerializerBase source, Set<String> toIgnore) {
+        super(source, toIgnore);
+    }
+
+
+
     @Override
     protected BeanSerializerBase withIgnorals(Set<String> set) {
-        return source.withIgnorals(set);
+        return new ExtraFieldSerializer(this, set);
     }
 
     @Override
     protected BeanSerializerBase asArraySerializer() {
-        return source.asArraySerializer();
+        return this;
     }
 
     @Override
