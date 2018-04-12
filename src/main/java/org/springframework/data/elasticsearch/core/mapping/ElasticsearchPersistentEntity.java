@@ -65,9 +65,9 @@ public interface ElasticsearchPersistentEntity<T> extends PersistentEntity<T, El
 
 	Map getJoinRelations();
 
-	String getJoinRoutingField();
+	String getJoinFieldName();
 
-	ElasticsearchPersistentProperty getFieldTypeV6();
+	String getTypeV6FieldName();
 
 	String getIndexTypeV6();
 

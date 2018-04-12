@@ -112,6 +112,10 @@ class MappingBuilder {
 			t.startObject(FIELD_PROPERTIES);
 		}
 
+		if (joinRelations != null && !joinRelations.isEmpty()) {
+			xContentBuilder.startObject(joinName).field(FIELD_TYPE, TYPE_JOIN).field(JOIN_RELATIONS, joinRelations).endObject();
+		}
+
 		for (java.lang.reflect.Field field : fields) {
 
 			if (field.isAnnotationPresent(Transient.class) || isInIgnoreFields(field, fieldAnnotation)) {
@@ -135,7 +139,7 @@ class MappingBuilder {
 
 			Field singleField = field.getAnnotation(Field.class);
 			if (isJoinField) {
-				xContentBuilder.startObject(joinName).field(FIELD_TYPE, TYPE_JOIN).field(JOIN_RELATIONS, joinRelations).endObject();
+				continue;
 			}
 			else if (!isGeoPointField && !isCompletionField && isEntity(field) && isAnnotated(field)) {
 				if (singleField == null) {

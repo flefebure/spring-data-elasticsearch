@@ -15,6 +15,7 @@
  */
 package org.springframework.data.elasticsearch.core;
 
+import com.fasterxml.jackson.databind.ser.std.ExtraFieldSerializer;
 import org.elasticsearch.action.ActionFuture;
 import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.action.admin.indices.alias.IndicesAliasesRequest;
@@ -231,7 +232,7 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 			if (mappings == null) {
 				try {
 					mappings = buildMapping(clazz, persistentEntity.getIndexType(), persistentEntity
-							.getIdProperty().getFieldName(), persistentEntity.getJoin()!=null?persistentEntity.getJoin().getFieldName():null, persistentEntity.getJoinRelations());
+							.getIdProperty().getFieldName(), persistentEntity.getJoinFieldName(), persistentEntity.getJoinRelations());
 				} catch (Exception e) {
 					throw new ElasticsearchException("Failed to build mapping for " + clazz.getSimpleName(), e);
 				}
@@ -1208,20 +1209,22 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 				} else {
 					indexRequestBuilder = client.prepareIndex(indexName, type);
 				}
-				indexRequestBuilder.setSource(resultsMapper.getEntityMapper().mapToString(query.getObject()), XContentType.JSON);
-
 				ElasticsearchPersistentEntity persistentEntity = getPersistentEntityFor(query.getObject().getClass());
-				if (persistentEntity.getJoin() != null && persistentEntity.getJoinRoutingField() != null) {
-					Object joinField = persistentEntity.getPropertyAccessor(query.getObject()).getProperty(persistentEntity.getJoin());
-					try {
-						Object routing = new PropertyDescriptor(persistentEntity.getJoinRoutingField(), joinField.getClass()).getReadMethod().invoke(joinField);
-						if (routing != null && routing instanceof String) {
-							indexRequestBuilder.setRouting((String)routing);
-						}
-					} catch (Exception e) {
-						logger.warn(e.getMessage(),e);
+				if (persistentEntity.getIndexTypeV6() != null) {
+					ExtraFieldSerializer.setTypeFieldName(persistentEntity.getTypeV6FieldName());
+					ExtraFieldSerializer.setTypeValue(persistentEntity.getIndexTypeV6());
+				}
+				if (persistentEntity.getJoinFieldName() != null) {
+					ExtraFieldSerializer.setJoinFieldName(persistentEntity.getJoinFieldName());
+					if (persistentEntity.getJoin() != null) {
+						String routing = (String) persistentEntity.getPropertyAccessor(query.getObject()).getProperty(persistentEntity.getJoin());
+						indexRequestBuilder.setRouting(routing);
+						ExtraFieldSerializer.setParentId(routing);
 					}
 				}
+				indexRequestBuilder.setSource(resultsMapper.getEntityMapper().mapToString(query.getObject()), XContentType.JSON);
+
+
 			} else if (query.getSource() != null) {
 				indexRequestBuilder = client.prepareIndex(indexName, type, query.getId()).setSource(query.getSource());
 			} else {
@@ -1241,6 +1244,13 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 		} catch (IOException e) {
 			throw new ElasticsearchException("failed to index the document [id: " + query.getId() + "]", e);
 		}
+		finally {
+			ExtraFieldSerializer.setTypeFieldName(null);
+			ExtraFieldSerializer.setTypeValue(null);
+			ExtraFieldSerializer.setJoinFieldName(null);
+			ExtraFieldSerializer.setParentId(null);
+		}
+
 	}
 
 	@Override
@@ -1336,10 +1346,7 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 		ElasticsearchPersistentEntity<?> persistentEntity = getPersistentEntityFor(clazz);
 		String typeV6 = persistentEntity.getIndexTypeV6();
 		if (typeV6 == null) return;
-		String fieldName = "type";
-		if (persistentEntity.getFieldTypeV6() != null) {
-			fieldName = persistentEntity.getFieldTypeV6().getFieldName();
-		}
+		String fieldName = persistentEntity.getTypeV6FieldName();
 		if (query instanceof NativeSearchQuery) {
 			NativeSearchQuery nativeSearchQuery = (NativeSearchQuery) query;
 			if (nativeSearchQuery.getQuery() instanceof BoolQueryBuilder) {

@@ -39,6 +39,8 @@ public @interface Document {
 
 	String typeV6() default "";
 
+	String typeV6FieldName() default "type";
+
 	boolean useServerConfiguration() default false;
 
 	short shards() default 5;

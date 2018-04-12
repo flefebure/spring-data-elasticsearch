@@ -25,10 +25,21 @@ import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
+import com.fasterxml.jackson.databind.ser.BeanSerializer;
+import com.fasterxml.jackson.databind.ser.BeanSerializerBuilder;
+import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
+import com.fasterxml.jackson.databind.ser.impl.BeanAsArraySerializer;
+import com.fasterxml.jackson.databind.ser.impl.ObjectIdWriter;
+import com.fasterxml.jackson.databind.ser.impl.UnwrappingBeanSerializer;
+import com.fasterxml.jackson.databind.ser.std.BeanSerializerBase;
+import com.fasterxml.jackson.databind.ser.std.ExtraFieldSerializer;
+import com.fasterxml.jackson.databind.util.NameTransformer;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.core.geo.CustomGeoModule;
 import org.springframework.data.geo.*;
 import java.util.List;
+import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -49,11 +60,30 @@ public class DefaultEntityMapper implements EntityMapper {
 	private ObjectMapper objectMapper;
 
 	public DefaultEntityMapper() {
-		objectMapper = new ObjectMapper();
+		objectMapper = new ObjectMapper() {};
 		objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 		objectMapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
 		objectMapper.registerModule(new CustomGeoModule());
+		objectMapper.registerModule(new SimpleModule(){
+			@Override
+			public void setupModule(SetupContext context) {
+				super.setupModule(context);
+				context.addBeanSerializerModifier(new BeanSerializerModifier() {
+					@Override
+					public JsonSerializer<?> modifySerializer(SerializationConfig config, BeanDescription beanDesc, JsonSerializer<?> serializer) {
+						if (serializer instanceof BeanSerializerBase) {
+							return new ExtraFieldSerializer(
+									(BeanSerializerBase) serializer);
+						}
+						return serializer;
+					}
+				});
+
+			}
+		});
 	}
+
+
 
 	@Override
 	public String mapToString(Object object) throws IOException {
@@ -64,4 +94,5 @@ public class DefaultEntityMapper implements EntityMapper {
 	public <T> T mapToObject(String source, Class<T> clazz) throws IOException {
 		return objectMapper.readValue(source, clazz);
 	}
+
 }

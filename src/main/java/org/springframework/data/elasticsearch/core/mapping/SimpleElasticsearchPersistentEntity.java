@@ -52,7 +52,7 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 
 	private String indexName;
 	private String indexType;
-	private ElasticsearchPersistentProperty fieldTypeV6;
+	private String typeV6FieldName;
 	private String indexTypeV6;
 	private boolean useServerConfiguration;
 	private short shards;
@@ -68,7 +68,7 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 	private ElasticsearchPartitioner indexPartitioner;
 	Map<String, ElasticsearchPersistentProperty> innerHitsProperties;
 	private ElasticsearchPersistentProperty join;
-	private String joinRoutingField;
+	private String joinFieldName;
 	private HashMap joinRelations;
 
 
@@ -96,6 +96,17 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 			this.partitionersParameters = typeInformation.getType().getAnnotation(Document.class).partitionersParameters();
 			this.partitionSeparator = typeInformation.getType().getAnnotation(Document.class).partitionSeparator();
 			this.indexTypeV6 = !document.typeV6().isEmpty()?document.typeV6():null;
+			this.typeV6FieldName = document.typeV6FieldName();
+
+
+		}
+		if (clazz.isAnnotationPresent(Join.class)) {
+			Join join = clazz.getAnnotation(Join.class);
+			this.joinFieldName = join.name();
+			joinRelations = new HashMap();
+			for (int i = 0; i < join.children().length ; i++) {
+				joinRelations.put(join.parent(), join.children()[i]);
+			}
 
 		}
 		if (clazz.isAnnotationPresent(Setting.class)) {
@@ -185,16 +196,8 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 			Join join = property.getField().getAnnotation(Join.class);
 			if (join != null) {
 				this.join = property;
-				this.joinRoutingField = join.routingField();
-				this.joinRelations = new HashMap();
-				for (int i = 0; i < join.joinChildren().length ; i++) {
-					joinRelations.put(join.joinParents()[i], join.joinChildren()[i]);
-				}
 			}
-			Type type = property.getField().getAnnotation(Type.class);
-			if (type != null) {
-				this.fieldTypeV6 = property;
-			}
+
 		}
 
 		if (property.isVersionProperty()) {
@@ -248,12 +251,12 @@ public class SimpleElasticsearchPersistentEntity<T> extends BasicPersistentEntit
 	}
 
 	@Override
-	public ElasticsearchPersistentProperty getFieldTypeV6() {
-		return fieldTypeV6;
+	public String getTypeV6FieldName() {
+		return typeV6FieldName;
 	}
 
 	@Override
-	public String getJoinRoutingField() {
-		return joinRoutingField;
+	public String getJoinFieldName() {
+		return joinFieldName;
 	}
 }

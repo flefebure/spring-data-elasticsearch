@@ -32,11 +32,9 @@ import java.lang.annotation.Target;
 @Persistent
 @Inherited
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.FIELD)
+@Target({ElementType.FIELD, ElementType.TYPE})
 public @interface Join {
-
-    String routingField();
-    String[] joinParents() default {};
-    String[] joinChildren() default {};
-
+    String name() default "join";
+    String parent() default "parent";
+    String[] children() default "child";
 }
