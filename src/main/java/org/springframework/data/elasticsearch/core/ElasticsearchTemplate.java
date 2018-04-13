@@ -70,6 +70,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.elasticsearch.ElasticsearchException;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Mapping;
+import org.springframework.data.elasticsearch.annotations.Setting;
 import org.springframework.data.elasticsearch.core.aggregation.AggregatedPage;
 import org.springframework.data.elasticsearch.core.aggregation.impl.AggregatedPageImpl;
 import org.springframework.data.elasticsearch.core.convert.ElasticsearchConverter;
@@ -1099,7 +1100,16 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 	@Override
 	public <T> boolean createIndex(Class<T> clazz, Object settings, String indexName) {
-
+		Class[] mappingsAtcreation = {};
+		if (settings == null && clazz != null) {
+			if (clazz.isAnnotationPresent(Setting.class)) {
+				ElasticsearchPersistentEntity persistentEntity = getPersistentEntityFor(clazz);
+				String settingPath = persistentEntity.settingPath();
+				if (isNotBlank(settingPath)) {
+					settings = readFileFromClasspath(settingPath);
+				}
+			}
+		}
 		if (settings  == null) {
 			logger.info("@Setting has to be defined. Using default instead.");
 			settings = getDefaultSettings(getPersistentEntityFor(clazz));

@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang.RandomStringUtils;
+import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.junit.Before;
 import org.junit.Test;
@@ -68,12 +69,13 @@ public class DynamicSettingAndMappingEntityRepositoryTests {
 		// then
 		assertThat(elasticsearchTemplate.indexExists(DynamicSettingAndMappingEntity.class), is(true));
 		Map map = elasticsearchTemplate.getSetting(DynamicSettingAndMappingEntity.class);
-		assertThat(map.containsKey("index.number_of_replicas"), is(true));
-		assertThat(map.containsKey("index.number_of_shards"), is(true));
-		assertThat(map.containsKey("index.analysis.analyzer.emailAnalyzer.tokenizer"), is(true));
-		assertThat((String) map.get("index.number_of_replicas"), is("0"));
-		assertThat((String) map.get("index.number_of_shards"), is("1"));
-		assertThat((String) map.get("index.analysis.analyzer.emailAnalyzer.tokenizer"), is("uax_url_email"));
+		Settings settings = (Settings)map.get("index");
+		assertThat(settings.hasValue("number_of_replicas"), is(true));
+		assertThat(settings.hasValue("number_of_shards"), is(true));
+		assertThat(settings.hasValue("analysis.analyzer.emailAnalyzer.tokenizer"), is(true));
+		assertThat((String) settings.get("number_of_replicas"), is("0"));
+		assertThat((String) settings.get("number_of_shards"), is("1"));
+		assertThat((String) settings.get("analysis.analyzer.emailAnalyzer.tokenizer"), is("uax_url_email"));
 	}
 
 	/*
@@ -134,7 +136,7 @@ public class DynamicSettingAndMappingEntityRepositoryTests {
 		String mappings = "{\n" +
 				"    \"test-setting-type\" : {\n" +
 				"        \"properties\" : {\n" +
-				"            \"email\" : {\"type\" : \"string\", \"analyzer\" : \"emailAnalyzer\" }\n" +
+				"            \"email\" : {\"type\" : \"text\", \"analyzer\" : \"emailAnalyzer\" }\n" +
 				"        }\n" +
 				"    }\n" +
 				"}";
