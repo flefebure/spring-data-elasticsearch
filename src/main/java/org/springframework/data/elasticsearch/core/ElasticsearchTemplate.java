@@ -251,7 +251,7 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 		PutMappingRequestBuilder requestBuilder = client.admin().indices()
 				.preparePutMapping(indexName).setType(type);
 		if (mapping instanceof String) {
-			requestBuilder.setSource(String.valueOf(mapping));
+			requestBuilder.setSource(String.valueOf(mapping), XContentType.JSON);
 		} else if (mapping instanceof Map) {
 			requestBuilder.setSource((Map) mapping);
 		} else if (mapping instanceof XContentBuilder) {
