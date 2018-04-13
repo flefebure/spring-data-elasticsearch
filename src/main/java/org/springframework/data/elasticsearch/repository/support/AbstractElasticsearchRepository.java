@@ -280,7 +280,7 @@ public abstract class AbstractElasticsearchRepository<T, ID extends Serializable
 		query.setObject(entity);
 		query.setId(stringIdRepresentation(extractIdFromBean(entity)));
 		query.setVersion(extractVersionFromBean(entity));
-		query.setParentId(extractParentIdFromBean(entity));
+		// migration to joins query.setParentId(extractParentIdFromBean(entity));
 		return query;
 	}
 
