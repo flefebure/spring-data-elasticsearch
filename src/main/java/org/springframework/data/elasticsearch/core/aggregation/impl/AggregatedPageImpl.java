@@ -20,6 +20,7 @@ public class AggregatedPageImpl<T> extends FacetedPageImpl<T> implements Aggrega
 	private Aggregations aggregations;
 	private Map<String, Aggregation> mapOfAggregations = new HashMap<String, Aggregation>();
 	private String scrollId;
+	private boolean timedOut = false;
 
 	public AggregatedPageImpl(List<T> content) {
 		super(content);
@@ -79,4 +80,15 @@ public class AggregatedPageImpl<T> extends FacetedPageImpl<T> implements Aggrega
 	public String getScrollId() {
 		return scrollId;
 	}
+
+	@Override
+	public boolean isTimedOut() {
+		return timedOut;
+	}
+
+	@Override
+	public void setTimedOut(boolean timedOut) {
+		this.timedOut = timedOut;
+	}
+
 }

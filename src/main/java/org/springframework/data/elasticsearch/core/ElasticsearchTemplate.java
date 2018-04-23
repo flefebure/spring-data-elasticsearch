@@ -17,6 +17,8 @@ package org.springframework.data.elasticsearch.core;
 
 import org.elasticsearch.action.ActionFuture;
 import org.elasticsearch.action.DocWriteResponse;
+import org.elasticsearch.ElasticsearchTimeoutException;
+import org.elasticsearch.action.ListenableActionFuture;
 import org.elasticsearch.action.admin.indices.alias.IndicesAliasesRequest;
 import org.elasticsearch.action.admin.indices.alias.get.GetAliasesRequest;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequestBuilder;
@@ -79,25 +81,7 @@ import org.springframework.data.elasticsearch.core.facet.FacetRequest;
 import org.springframework.data.elasticsearch.core.mapping.ElasticsearchPersistentEntity;
 import org.springframework.data.elasticsearch.core.mapping.SimpleElasticsearchMappingContext;
 import org.springframework.data.elasticsearch.core.partition.ElasticsearchPartitioner;
-import org.springframework.data.elasticsearch.core.partition.keys.Partition;
-import org.springframework.data.elasticsearch.core.query.AliasQuery;
-import org.springframework.data.elasticsearch.core.query.Criteria;
-import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
-import org.springframework.data.elasticsearch.core.query.DeleteById;
-import org.springframework.data.elasticsearch.core.query.DeleteQuery;
-import org.springframework.data.elasticsearch.core.query.FetchSourceFilter;
-import org.springframework.data.elasticsearch.core.query.GetQuery;
-import org.springframework.data.elasticsearch.core.query.IndexBoost;
-import org.springframework.data.elasticsearch.core.query.IndexQuery;
-import org.springframework.data.elasticsearch.core.query.MoreLikeThisQuery;
-import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
-import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
-import org.springframework.data.elasticsearch.core.query.Query;
-import org.springframework.data.elasticsearch.core.query.ScriptField;
-import org.springframework.data.elasticsearch.core.query.SearchQuery;
-import org.springframework.data.elasticsearch.core.query.SourceFilter;
-import org.springframework.data.elasticsearch.core.query.StringQuery;
-import org.springframework.data.elasticsearch.core.query.UpdateQuery;
+import org.springframework.data.elasticsearch.core.query.*;
 import org.springframework.data.mapping.PersistentProperty;
 import org.springframework.data.util.CloseableIterator;
 import org.springframework.util.Assert;
@@ -105,14 +89,7 @@ import org.springframework.util.Assert;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
+import java.util.*;
 
 import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.commons.lang.StringUtils.isNotBlank;
@@ -362,7 +339,11 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 	@Override
 	public <T> List<T> queryForList(SearchQuery query, Class<T> clazz) {
-		return queryForPage(query, clazz).getContent();
+		ScrolledPage<T> resultPage = queryForPage(query, clazz);
+		if (resultPage.isTimedOut()) {
+			throw new ElasticsearchTimeoutException("Timed out while querying page.");
+		}
+		return resultPage.getContent();
 	}
 
 	@Override
@@ -375,7 +356,13 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 		if (query.getFilter() != null) {
 			request.setPostFilter(query.getFilter());
 		}
+		if (query.getTimeOut()!=null) {
+			request.setTimeout(query.getTimeOut());
+		}
 		SearchResponse response = getSearchResponse(request.execute());
+		if (response.isTimedOut()) {
+			throw new ElasticsearchTimeoutException("Timed out while querying ids.");
+		}
 		return extractIds(response);
 	}
 
@@ -425,12 +412,20 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 	@Override
 	public <T> CloseableIterator<T> stream(SearchQuery query, Class<T> clazz) {
-		return stream(query, clazz, resultsMapper);
+		SearchResultMapper mapper = resultsMapper;
+		if (query.getTimeOut()!=null) {
+			mapper = new CumulativeTimeOutMapper(elasticsearchConverter.getMappingContext(),query.getTimeOut());
+		}
+		return stream(query, clazz, mapper);
 	}
 
 	@Override
 	public <T> CloseableIterator<T> stream(long scrollTimeInMillis, SearchQuery query, Class<T> clazz) {
-		return doStream(scrollTimeInMillis, (ScrolledPage<T>) startScroll(scrollTimeInMillis, query, clazz, resultsMapper), clazz, resultsMapper);
+		SearchResultMapper mapper = resultsMapper;
+		if (query.getTimeOut()!=null) {
+			mapper = new CumulativeTimeOutMapper(elasticsearchConverter.getMappingContext(),query.getTimeOut());
+		}
+		return doStream(scrollTimeInMillis, (ScrolledPage<T>) startScroll(scrollTimeInMillis, query, clazz, mapper), clazz, mapper);
 	}
 
 	@Override
@@ -450,6 +445,8 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 			/** If stream is finished (ie: cluster returns no results. */
 			private volatile boolean finished = !currentHits.hasNext();
+
+			private volatile boolean timedOut = false;
 
 			@Override
 			public void close() {
@@ -472,13 +469,19 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 				}
 				// Test if it remains hits
 				if (currentHits == null || !currentHits.hasNext()) {
+					// if we timed out on last page fetch, we will not fetch another page
+					if (timedOut) {
+						throw new ElasticsearchTimeoutException("Timed out while fetching page "+scrollId);
+					}
 					// Do a new request
 					final ScrolledPage<T> scroll = (ScrolledPage<T>) continueScroll(scrollId, scrollTimeInMillis, clazz, mapper);
 					// Save hits and scroll id
 					currentHits = scroll.iterator();
 					finished = !currentHits.hasNext();
 					scrollId = scroll.getScrollId();
+					timedOut = scroll.isTimedOut();
 				}
+				// if we time out, this will be the last page we return
 				return currentHits.hasNext();
 			}
 
@@ -506,10 +509,10 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 			SearchRequestBuilder builder = prepareCount(criteriaQuery, clazz);
 			if (builder == null)
 				return 0l;
-			return doCount(builder, elasticsearchQuery);
+			return doCount(builder, elasticsearchQuery, 0);
 		} else {
 			// filter could not be set into CountRequestBuilder, convert request into search request
-			return doCount(prepareSearch(criteriaQuery, clazz), elasticsearchQuery, elasticsearchFilter);
+			return doCount(prepareSearch(criteriaQuery, clazz), elasticsearchQuery, elasticsearchFilter, 0);
 		}
 	}
 
@@ -518,11 +521,22 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 		QueryBuilder elasticsearchQuery = searchQuery.getQuery();
 		QueryBuilder elasticsearchFilter = searchQuery.getFilter();
 
+		long timeOut = 0;
 		if (elasticsearchFilter == null) {
-			return doCount(prepareCount(searchQuery, clazz), elasticsearchQuery);
+			SearchRequestBuilder searchRequest = prepareCount(searchQuery, clazz);
+			if (searchQuery.getTimeOut() != null) {
+				searchRequest.setTimeout(searchQuery.getTimeOut());
+				timeOut = searchQuery.getTimeOut().millis();
+			}
+			return doCount(searchRequest, elasticsearchQuery, timeOut);
 		} else {
 			// filter could not be set into CountRequestBuilder, convert request into search request
-			return doCount(prepareSearch(searchQuery, clazz), elasticsearchQuery, elasticsearchFilter);
+			SearchRequestBuilder searchRequest = prepareSearch(searchQuery, clazz);
+			if (searchQuery.getTimeOut() != null) {
+				searchRequest.setTimeout(searchQuery.getTimeOut());
+				timeOut = searchQuery.getTimeOut().millis();
+			}
+			return doCount(searchRequest, elasticsearchQuery, elasticsearchFilter, timeOut);
 		}
 	}
 
@@ -536,15 +550,18 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 		return count(query, null);
 	}
 
-	private long doCount(SearchRequestBuilder countRequestBuilder, QueryBuilder elasticsearchQuery) {
+	private long doCount(SearchRequestBuilder countRequestBuilder, QueryBuilder elasticsearchQuery, long timeOut) {
 
 		if (elasticsearchQuery != null) {
 			countRequestBuilder.setQuery(elasticsearchQuery);
 		}
-		return countRequestBuilder.execute().actionGet().getHits().getTotalHits();
+		// catch time outs
+		TimeOutListenableActionFuture<SearchResponse> future = new TimeOutListenableActionFuture<>(client.threadPool(), timeOut, "doCount");
+		countRequestBuilder.execute(future);
+		return future.actionGet().getHits().getTotalHits();
 	}
 
-	private long doCount(SearchRequestBuilder searchRequestBuilder, QueryBuilder elasticsearchQuery, QueryBuilder elasticsearchFilter) {
+	private long doCount(SearchRequestBuilder searchRequestBuilder, QueryBuilder elasticsearchQuery, QueryBuilder elasticsearchFilter, long timeOut) {
 		if (elasticsearchQuery != null) {
 			searchRequestBuilder.setQuery(elasticsearchQuery);
 		} else {
@@ -553,7 +570,10 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 		if (elasticsearchFilter != null) {
 			searchRequestBuilder.setPostFilter(elasticsearchFilter);
 		}
-		return searchRequestBuilder.execute().actionGet().getHits().getTotalHits();
+		// catch time outs
+		TimeOutListenableActionFuture<SearchResponse> future = new TimeOutListenableActionFuture<SearchResponse>(client.threadPool(), timeOut, "doCountWithTimeOut");
+		searchRequestBuilder.execute(future);
+		return future.actionGet().getHits().getTotalHits();
 	}
 
 	private <T> SearchRequestBuilder prepareCount(Query query, Class<T> clazz) {
@@ -937,7 +957,16 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 			requestBuilder.setPostFilter(searchQuery.getFilter());
 		}
 
-		return getSearchResponse(requestBuilder.setQuery(searchQuery.getQuery()).execute());
+		long timeOut = 0;
+		if (searchQuery.getTimeOut() != null) {
+			requestBuilder.setTimeout(searchQuery.getTimeOut());
+			timeOut = searchQuery.getTimeOut().millis();
+		}
+
+		// catch time outs
+		TimeOutListenableActionFuture<SearchResponse> future = new TimeOutListenableActionFuture<SearchResponse>(client.threadPool(),timeOut, "doScroll");
+		requestBuilder.setQuery(searchQuery.getQuery()).execute(future);
+		return getSearchResponse(future);
 	}
 
 	public <T> Page<T> startScroll(long scrollTimeInMillis, SearchQuery searchQuery, Class<T> clazz) {
@@ -969,7 +998,7 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 	public <T> Page<T> continueScroll(@Nullable String scrollId, long scrollTimeInMillis, Class<T> clazz, SearchResultMapper mapper) {
 		SearchResponse response = getSearchResponse(client.prepareSearchScroll(scrollId)
 				.setScroll(TimeValue.timeValueMillis(scrollTimeInMillis)).execute());
-		return resultsMapper.mapResults(response, clazz, null);
+		return mapper.mapResults(response, clazz, null);
 	}
 
 	@Override
@@ -1028,6 +1057,10 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 			for (SortBuilder sort : searchQuery.getElasticsearchSorts()) {
 				searchRequest.addSort(sort);
 			}
+		}
+
+		if (searchQuery.getTimeOut()!=null) {
+			searchRequest.setTimeout(searchQuery.getTimeOut());
 		}
 
 		if (!searchQuery.getScriptFields().isEmpty()) {

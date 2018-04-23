@@ -17,6 +17,7 @@ package org.springframework.data.elasticsearch.core.query;
 
 import java.util.List;
 
+import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.search.aggregations.AbstractAggregationBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
@@ -54,5 +55,7 @@ public interface SearchQuery extends Query {
 	int getSize();
 
 	String getPreference();
+
+	TimeValue getTimeOut();
 
 }

@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import org.elasticsearch.action.search.SearchType;
+import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.search.aggregations.AbstractAggregationBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
@@ -59,6 +60,7 @@ public class NativeSearchQueryBuilder {
 	private int from;
 	private int size;
 	private String preference;
+	private String timeOut;
 
 	public NativeSearchQueryBuilder withPreference(String preference) {
 		this.preference = preference;
@@ -150,6 +152,11 @@ public class NativeSearchQueryBuilder {
 		return this;
 	}
 
+	public NativeSearchQueryBuilder withTimeOut(String timeOut) {
+		this.timeOut = timeOut;
+		return this;
+	}
+
 	public NativeSearchQuery build() {
 		NativeSearchQuery nativeSearchQuery = new NativeSearchQuery(queryBuilder, filterBuilder, sortBuilders, highlightFields);
 		if (pageable != null) {
@@ -209,6 +216,11 @@ public class NativeSearchQueryBuilder {
 		nativeSearchQuery.setFrom(from);
 		nativeSearchQuery.setSize(size);
 		nativeSearchQuery.setPreference(preference);
+
+		if (timeOut != null) {
+			TimeValue timeOutValue = TimeValue.parseTimeValue(timeOut,"timeout");
+			nativeSearchQuery.setTimeOut(timeOutValue);
+		}
 
 		return nativeSearchQuery;
 	}
