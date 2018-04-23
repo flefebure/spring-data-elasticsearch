@@ -17,15 +17,15 @@ class TimeOutListenableActionFuture<Response extends SearchResponse> extends Pla
     private final String name;
 
     public TimeOutListenableActionFuture(ThreadPool threadPool, long timeOutMillis, String name) {
-        super(threadPool);
+        super();
         this.timeOutMillis = timeOutMillis;
         this.name = name;
     }
 
     @Override
     protected Response convert(Response response) {
-        if (response.isTimedOut() || (this.timeOutMillis!=0 && response.getTookInMillis()>this.timeOutMillis)) {
-            throw new ElasticsearchTimeoutException("Time out, query took " + response.getTookInMillis()+" millis");
+        if (response.isTimedOut() || (this.timeOutMillis!=0 && response.getTook().getMillis()>this.timeOutMillis)) {
+            throw new ElasticsearchTimeoutException("Time out, query took " + response.getTook().getMillis()+" millis");
         }
         return response;
     }

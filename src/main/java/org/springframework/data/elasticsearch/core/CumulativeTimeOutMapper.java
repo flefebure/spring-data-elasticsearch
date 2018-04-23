@@ -30,7 +30,7 @@ class CumulativeTimeOutMapper extends DefaultResultMapper {
     @Override
     public <T> AggregatedPage<T> mapResults(SearchResponse response, Class<T> clazz, Pageable pageable) {
         AggregatedPage<T> page = super.mapResults(response, clazz, pageable);
-        this.totalTime += response.getTookInMillis();
+        this.totalTime += response.getTook().getMillis();
         if (this.timeOut != TimeValue.MINUS_ONE && this.timeOut!=TimeValue.ZERO
              && this.totalTime > timeOut.millis()) {
             page.setTimedOut(true);
