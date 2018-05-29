@@ -21,6 +21,7 @@ import java.util.List;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.search.aggregations.AbstractAggregationBuilder;
+import org.elasticsearch.search.aggregations.pipeline.AbstractPipelineAggregationBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
 import org.elasticsearch.search.sort.SortBuilder;
 import org.springframework.data.elasticsearch.core.facet.FacetRequest;
@@ -42,6 +43,7 @@ public class NativeSearchQuery extends AbstractQuery implements SearchQuery {
     private final List<ScriptField> scriptFields = new ArrayList<ScriptField>();
 	private List<FacetRequest> facets;
 	private List<AbstractAggregationBuilder> aggregations;
+	private List<AbstractPipelineAggregationBuilder> pipelineAggregators;
 	private HighlightBuilder.Field[] highlightFields;
 	private List<IndexBoost> indicesBoost;
 	private int from;
@@ -136,6 +138,23 @@ public class NativeSearchQuery extends AbstractQuery implements SearchQuery {
 	public void setAggregations(List<AbstractAggregationBuilder> aggregations) {
 		this.aggregations = aggregations;
 	}
+
+	@Override
+	public List<AbstractPipelineAggregationBuilder> getPipelineAggregators() {
+		return pipelineAggregators;
+	}
+
+	public void addPipelineAggregator(AbstractPipelineAggregationBuilder pipelineAggregationBuilder) {
+		if (pipelineAggregators == null) {
+			pipelineAggregators = new ArrayList<AbstractPipelineAggregationBuilder>();
+		}
+		pipelineAggregators.add(pipelineAggregationBuilder);
+	}
+
+	public void setPipelineAggregators(List<AbstractPipelineAggregationBuilder> pipelineAggregators) {
+		this.pipelineAggregators = pipelineAggregators;
+	}
+
 
 	@Override
 	public List<IndexBoost> getIndicesBoost() {

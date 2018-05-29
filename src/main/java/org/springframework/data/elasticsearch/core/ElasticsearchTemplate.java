@@ -52,6 +52,7 @@ import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.aggregations.AbstractAggregationBuilder;
+import org.elasticsearch.search.aggregations.pipeline.AbstractPipelineAggregationBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
 import org.elasticsearch.search.sort.SortBuilder;
 import org.elasticsearch.search.sort.SortOrder;
@@ -1110,6 +1111,12 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 		if (!isEmpty(searchQuery.getAggregations())) {
 			for (AbstractAggregationBuilder aggregationBuilder : searchQuery.getAggregations()) {
 				searchRequest.addAggregation(aggregationBuilder);
+			}
+		}
+
+		if (!isEmpty(searchQuery.getPipelineAggregators())) {
+			for (AbstractPipelineAggregationBuilder pipelineAggregationBuilder : searchQuery.getPipelineAggregators()) {
+				searchRequest.addAggregation(pipelineAggregationBuilder);
 			}
 		}
 

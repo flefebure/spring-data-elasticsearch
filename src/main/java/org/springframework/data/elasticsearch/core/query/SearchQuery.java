@@ -20,6 +20,7 @@ import java.util.List;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.search.aggregations.AbstractAggregationBuilder;
+import org.elasticsearch.search.aggregations.pipeline.AbstractPipelineAggregationBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
 import org.elasticsearch.search.sort.SortBuilder;
 import org.springframework.data.elasticsearch.core.facet.FacetRequest;
@@ -43,6 +44,8 @@ public interface SearchQuery extends Query {
 	List<FacetRequest> getFacets();
 
 	List<AbstractAggregationBuilder> getAggregations();
+
+	List<AbstractPipelineAggregationBuilder> getPipelineAggregators();
 
 	HighlightBuilder.Field[] getHighlightFields();
 

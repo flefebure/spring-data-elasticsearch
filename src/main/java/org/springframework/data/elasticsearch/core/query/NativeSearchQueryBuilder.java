@@ -23,6 +23,7 @@ import org.elasticsearch.action.search.SearchType;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.search.aggregations.AbstractAggregationBuilder;
+import org.elasticsearch.search.aggregations.pipeline.AbstractPipelineAggregationBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
 import org.elasticsearch.search.sort.SortBuilder;
 import org.springframework.data.domain.Pageable;
@@ -45,6 +46,7 @@ public class NativeSearchQueryBuilder {
 	private List<SortBuilder> sortBuilders = new ArrayList<SortBuilder>();
 	private List<FacetRequest> facetRequests = new ArrayList<FacetRequest>();
 	private List<AbstractAggregationBuilder> aggregationBuilders = new ArrayList<AbstractAggregationBuilder>();
+	private List<AbstractPipelineAggregationBuilder> pipelineAggregationBuilders = new ArrayList<AbstractPipelineAggregationBuilder>();
 	private HighlightBuilder.Field[] highlightFields;
 	private Pageable pageable;
 	private String[] indices;
@@ -89,6 +91,11 @@ public class NativeSearchQueryBuilder {
 
 	public NativeSearchQueryBuilder addAggregation(AbstractAggregationBuilder aggregationBuilder) {
 		this.aggregationBuilders.add(aggregationBuilder);
+		return this;
+	}
+
+	public NativeSearchQueryBuilder addPipelineAggregation(AbstractPipelineAggregationBuilder pipelineAggregationBuilder) {
+		this.pipelineAggregationBuilders.add(pipelineAggregationBuilder);
 		return this;
 	}
 
@@ -193,6 +200,10 @@ public class NativeSearchQueryBuilder {
 
 		if (!isEmpty(aggregationBuilders)) {
 			nativeSearchQuery.setAggregations(aggregationBuilders);
+		}
+
+		if (!isEmpty(pipelineAggregationBuilders)) {
+			nativeSearchQuery.setPipelineAggregators(pipelineAggregationBuilders);
 		}
 
 		if (minScore > 0) {
