@@ -45,13 +45,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * @author Artur Konczak
@@ -131,17 +125,21 @@ public class DefaultResultMapper extends AbstractResultMapper {
 					}
 					else {
 						field.setAccessible(true);
-						Map<String, Object> scriptFields = null;
-						try {
-							scriptFields = (Map<String, Object>)field.get(result);
-						} catch (IllegalAccessException e) {
-							throw new ElasticsearchException("failed to access scripted field: " + field.getName(), e);
-						}
+
+						Map<String, Object> scriptFields = new HashMap<>();
 						for (String fieldName : hit.getFields().keySet()) {
 							DocumentField searchHitField = hit.getFields().get(fieldName);
 							if (searchHitField != null && searchHitField.getValue() != null) {
 								scriptFields.put(fieldName, searchHitField.getValue() );
 							}
+						}
+						try {
+							field.set(result, scriptFields);
+						} catch (IllegalArgumentException e) {
+							throw new ElasticsearchException("failed to set scripted field: " + field.getName() + " with value: "
+									+ scriptFields, e);
+						} catch (IllegalAccessException e) {
+							throw new ElasticsearchException("failed to access scripted field: " + field.getName(), e);
 						}
 
 					}
