@@ -15,5 +15,6 @@ public @interface ScriptedField {
      * the field name.
      */
     String name() default "";
+    boolean asMap() default false;
 
 }

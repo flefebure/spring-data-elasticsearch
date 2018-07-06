@@ -20,10 +20,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.get.MultiGetItemResponse;
@@ -109,20 +106,38 @@ public class DefaultResultMapper extends AbstractResultMapper {
             for (java.lang.reflect.Field field : result.getClass().getDeclaredFields()) {
                 ScriptedField scriptedField = field.getAnnotation(ScriptedField.class);
                 if (scriptedField != null) {
-                    String name = scriptedField.name().isEmpty() ? field.getName() : scriptedField.name();
-                    SearchHitField searchHitField = hit.getFields().get(name);
-                    if (searchHitField != null) {
-                        field.setAccessible(true);
-                        try {
-                            field.set(result, searchHitField.getValue());
-                        } catch (IllegalArgumentException e) {
-                            throw new ElasticsearchException("failed to set scripted field: " + name + " with value: "
-                                    + searchHitField.getValue(), e);
-                        } catch (IllegalAccessException e) {
-                            throw new ElasticsearchException("failed to access scripted field: " + name, e);
-                        }
-                    }
+                	if (!scriptedField.asMap()) {
+						String name = scriptedField.name().isEmpty() ? field.getName() : scriptedField.name();
+						SearchHitField searchHitField = hit.getFields().get(name);
+						if (searchHitField != null) {
+							field.setAccessible(true);
+							try {
+								field.set(result, searchHitField.getValue());
+							} catch (IllegalArgumentException e) {
+								throw new ElasticsearchException("failed to set scripted field: " + name + " with value: "
+										+ searchHitField.getValue(), e);
+							} catch (IllegalAccessException e) {
+								throw new ElasticsearchException("failed to access scripted field: " + name, e);
+							}
+						}
+					}
                 }
+                else {
+					field.setAccessible(true);
+					Map<String, Object> scriptFields = null;
+					try {
+						scriptFields = (Map<String, Object>)field.get(result);
+					} catch (IllegalAccessException e) {
+						throw new ElasticsearchException("failed to access scripted field: " + field.getName(), e);
+					}
+					for (String fieldName : hit.getFields().keySet()) {
+						SearchHitField searchHitField = hit.getFields().get(fieldName);
+						if (searchHitField != null && searchHitField.getValue() != null) {
+							scriptFields.put(fieldName, searchHitField.getValue() );
+						}
+					}
+
+				}
             }
         }
     }
