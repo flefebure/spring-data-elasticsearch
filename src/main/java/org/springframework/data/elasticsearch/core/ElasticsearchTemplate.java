@@ -1491,7 +1491,7 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 		return values;
 	}
 
-	protected ResultsMapper getResultsMapper() {
+	public ResultsMapper getResultsMapper() {
 		return resultsMapper;
 	}
 
