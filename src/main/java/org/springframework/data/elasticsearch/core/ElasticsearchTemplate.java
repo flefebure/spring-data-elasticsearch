@@ -945,6 +945,9 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 		if (!isEmpty(query.getFields())) {
 			requestBuilder.setFetchSource(toArray(query.getFields()), null);
 		}
+		if (query.getSourceFilter() != null) {
+			requestBuilder.setFetchSource(query.getSourceFilter().getIncludes(), query.getSourceFilter().getExcludes());
+		}
 //		TODO: AKO check if we can ignore this
 //		if (noFields) {
 //			requestBuilder.setNoFields();
