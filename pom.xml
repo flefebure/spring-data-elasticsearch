@@ -4,7 +4,7 @@
 
     <groupId>org.springframework.data</groupId>
     <artifactId>spring-data-elasticsearch</artifactId>
-    <version>2.3.1.1.SOFTBRIDGE-SNAPSHOT</version>
+    <version>2.3.1.1.SOFTBRIDGE</version>
 
     <parent>
         <groupId>org.springframework.data.build</groupId>
