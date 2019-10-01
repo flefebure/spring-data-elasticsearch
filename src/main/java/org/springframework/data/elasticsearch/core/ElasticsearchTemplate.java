@@ -948,6 +948,14 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 		if (query.getSourceFilter() != null) {
 			requestBuilder.setFetchSource(query.getSourceFilter().getIncludes(), query.getSourceFilter().getExcludes());
 		}
+		if (query instanceof NativeSearchQuery) {
+			if (((NativeSearchQuery)query).getScriptFields() != null){
+				for (ScriptField scriptField : ((NativeSearchQuery)query).getScriptFields()) {
+					requestBuilder.addScriptField(scriptField.fieldName(), scriptField.script());
+				}
+			}
+		}
+
 //		TODO: AKO check if we can ignore this
 //		if (noFields) {
 //			requestBuilder.setNoFields();
