@@ -825,9 +825,7 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 		String indexName = isNotBlank(deleteQuery.getIndex()) ? deleteQuery.getIndex() : getPersistentEntityFor(clazz).getIndexName();
 		String typeName = isNotBlank(deleteQuery.getType()) ? deleteQuery.getType() : getPersistentEntityFor(clazz).getIndexType();
-		if (elasticsearchPartitioner != null && elasticsearchPartitioner.isIndexPartitioned(clazz)) {
-			indexName = indexName+"*";
-		}
+
 		Integer pageSize = deleteQuery.getPageSize() != null ? deleteQuery.getPageSize() : 1000;
 		Long scrollTimeInMillis = deleteQuery.getScrollTimeInMillis() != null ? deleteQuery.getScrollTimeInMillis() : 10000l;
 
@@ -852,7 +850,7 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 			}
 		};
 
-		Page<String> scrolledResult = startScroll(scrollTimeInMillis, searchQuery, String.class, onlyIdResultMapper);
+		Page<String> scrolledResult = startScroll(scrollTimeInMillis, searchQuery, String.class, onlyIdResultMapper, true);
 		BulkRequestBuilder bulkRequestBuilder = client.prepareBulk();
 		List<String> ids = new ArrayList<String>();
 
@@ -932,7 +930,8 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 	}
 
 	private <T> SearchRequestBuilder prepareScroll(Query query, long scrollTimeInMillis, boolean noFields, Class<T> clazz) {
-		setPersistentEntityIndexAndType(query, clazz);
+		if (!noFields)
+			setPersistentEntityIndexAndType(query, clazz);
 		return prepareScroll(query, scrollTimeInMillis, noFields);
 	}
 
@@ -1017,6 +1016,11 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 
 	public <T> Page<T> startScroll(long scrollTimeInMillis, SearchQuery searchQuery, Class<T> clazz, SearchResultMapper mapper) {
 		SearchResponse response = doScroll(prepareScroll(searchQuery, scrollTimeInMillis,false, clazz), searchQuery);
+		return mapper.mapResults(response, clazz, null);
+	}
+
+	public <T> Page<T> startScroll(long scrollTimeInMillis, SearchQuery searchQuery, Class<T> clazz, SearchResultMapper mapper, boolean noFields) {
+		SearchResponse response = doScroll(prepareScroll(searchQuery, scrollTimeInMillis,noFields, clazz), searchQuery);
 		return mapper.mapResults(response, clazz, null);
 	}
 
